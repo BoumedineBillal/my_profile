@@ -1,0 +1,18 @@
+/* Layout styles (Header, Footer, Grid, etc.) */
+header,
+footer {
+    width: 100%;
+    padding: var(--spacing-md);
+    background: var(--white);
+    text-align: center;
+}
+
+main {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 var(--spacing-md);
+}
+
+.section {
+    margin-bottom: var(--spacing-lg);
+}
