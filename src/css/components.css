@@ -1,31 +1,165 @@
-/* Component Styles */
+/* Component System */
 
-/* Buttons */
-.btn {
-    display: inline-block;
-    padding: 0.8rem 1.6rem;
-    background-color: var(--primary-color);
-    color: #0f172a;
-    /* Dark text on bright button for contrast */
-    font-weight: 600;
-    text-decoration: none;
+/* 1. Floating Glass Navbar */
+.nav-wrapper {
+    position: fixed;
+    top: var(--space-sm);
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+}
+
+.nav-glass {
+    background: var(--bg-glass);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: var(--border-subtle);
+    padding: 0.75rem 2rem;
     border-radius: 50px;
-    /* Pill shape */
-    transition: transform 0.2s, background-color 0.2s;
+    /* Fully rounded pill shape */
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
 }
 
-.btn:hover {
-    background-color: var(--primary-dark);
-    transform: translateY(-2px);
-    color: white;
+.nav-brand {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+    text-decoration: none;
+    padding-right: var(--space-md);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.btn-sm {
-    padding: 0.5rem 1rem;
+.nav-item {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.nav-item:hover,
+.nav-item.active {
+    color: var(--text-primary);
+}
+
+
+/* 2. Hero Typography */
+.hero-overline {
+    font-family: var(--font-mono);
+    color: var(--text-accent);
     font-size: 0.9rem;
+    letter-spacing: 1px;
+    margin-bottom: var(--space-sm);
+    display: block;
 }
 
-/* Text Highlight */
-.highlight {
-    color: var(--primary-color);
+.hero-title {
+    font-size: 4rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    margin-bottom: var(--space-sm);
+    background: linear-gradient(to right, #fff, #94a3b8);
+    /* Subtle metallic text gradient */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero-bio {
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    max-width: 500px;
+    margin-bottom: var(--space-md);
+}
+
+@media (max-width: 900px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
+
+    .hero-bio {
+        margin: 0 auto var(--space-md);
+    }
+}
+
+
+/* 3. Tech Button (Glow Effect) */
+.btn-tech {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(59, 130, 246, 0.1);
+    /* Very subtle blue tint */
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: var(--text-accent);
+    padding: 0.8rem 1.6rem;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-tech:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: var(--text-accent);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+    /* Glow */
+    transform: translateY(-2px);
+}
+
+
+/* 4. Tech Frame (Profile Image) */
+.img-tech-frame {
+    position: relative;
+    width: 320px;
+    height: 380px;
+    /* Portrait ratio */
+    margin: 0 auto;
+}
+
+.img-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-surface);
+    border-radius: 20px;
+    border: var(--border-subtle);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    position: relative;
+    z-index: 2;
+}
+
+/* The glow/border behind */
+.img-tech-frame::before {
+    content: '';
+    position: absolute;
+    top: -20px;
+    right: -20px;
+    bottom: 20px;
+    left: 20px;
+    /* Offset square */
+    border: 2px solid var(--primary);
+    border-radius: 24px;
+    opacity: 0.3;
+    z-index: 1;
+    transition: transform 0.4s ease;
+}
+
+.hero-grid:hover .img-tech-frame::before {
+    transform: translate(-5px, 5px);
+    /* Interactive movement */
+    opacity: 0.6;
 }
