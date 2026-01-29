@@ -1,9 +1,51 @@
+/* Google Fonts Import */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 :root {
+    /* Professional Tech Palette (Deep Navy & Emerald/Blue) */
     --primary-color: #2563eb;
-    --secondary-color: #1e40af;
-    --text-color: #333;
-    --bg-color: #f0f2f5;
+    /* Vibrant Blue */
+    --primary-dark: #1e40af;
+    /* Darker Blue for hover */
+    --secondary-color: #10b981;
+    /* Emerald Green (Accent) */
+
+    --bg-color: #f8fafc;
+    /* Very light gray/blue tint background */
+    --bg-card: #ffffff;
+    /* White for cards */
+
+    --text-main: #1e293b;
+    /* Slate 800 - High contrast text */
+    --text-muted: #64748b;
+    /* Slate 500 - Secondary text */
+
     --white: #ffffff;
-    --spacing-md: 1rem;
-    --spacing-lg: 2rem;
+
+    /* Spacing */
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 3rem;
+    --spacing-xl: 5rem;
+
+    /* Effects */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+    --radius-md: 0.5rem;
+    --radius-lg: 1rem;
+
+    --font-main: 'Inter', sans-serif;
+}
+
+[data-theme="dark"] {
+    --bg-color: #0f172a;
+    /* Slate 900 */
+    --bg-card: #1e293b;
+    /* Slate 800 */
+    --text-main: #f8fafc;
+    /* Slate 50 */
+    --text-muted: #94a3b8;
+    /* Slate 400 */
 }

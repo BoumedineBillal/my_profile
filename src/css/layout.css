@@ -1,22 +1,21 @@
-/* Layout styles (Header, Footer, Grid, etc.) */
+/* Layout styles */
 header,
 footer {
     width: 100%;
-    padding: var(--spacing-md);
-    background: var(--white);
+    padding: var(--spacing-sm) 0;
+    background: var(--bg-card);
     text-align: center;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 main {
-    max-width: 900px;
-    /* Increased max-width for better grid layout */
-    margin: 2rem auto;
-    padding: 0 var(--spacing-md);
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--spacing-xl) var(--spacing-md);
 }
 
 .section {
-    margin-bottom: 4rem;
-    /* More spacing between major sections */
+    margin-bottom: var(--spacing-xl);
 }
 
 /* Grids */
