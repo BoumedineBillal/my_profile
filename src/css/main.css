@@ -1,31 +1,6 @@
-@import 'variables.css';
-@import 'layout.css';
-@import 'nav.css';
-
-/* Basic Reset & Global Typography */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: var(--font-main);
-    background-color: var(--bg-color);
-    color: var(--text-main);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-}
-
-/* Main reset - letting layout.css handle structure */
-main {
-    background: transparent;
-    padding: 0;
-    box-shadow: none;
-    text-align: left;
-}
-
-h1 {
-    margin-bottom: 1rem;
-    color: #1a1a1a;
-}
+/* Main CSS */
+/* 
+   Since we are using Tailwind via CDN for this initial version, 
+   most styles are in classes in index.html.
+   This file is reserved for future custom CSS or when setting up a full build step.
+*/
