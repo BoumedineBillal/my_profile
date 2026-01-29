@@ -9,94 +9,58 @@
 </head>
 
 <body>
-    <header>
-        <h1>[My Name]</h1>
-        <p class="subtitle">[ML & Computer Vision Engineer]</p>
-        <nav>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <div class="logo">[My Name]</div>
             <ul class="nav-links">
-                <li><a href="index.html" class="active">Home</a></li>
-                <li><a href="pages/projects.html">Projects</a></li>
-                <li><a href="#contact">Contact</a></li>
+                <li><a href="#" class="active">Home</a></li>
+                <!-- Add more links here later -->
+                <!-- <li><a href="pages/projects.html">Projects</a></li> -->
             </ul>
-        </nav>
-    </header>
+            <a href="mailto:email@example.com" class="btn btn-sm">Contact Me</a>
+        </div>
+    </nav>
 
-    <main>
-        <!-- Hero Section -->
+    <main class="container">
+        <!-- Hero Section: Split Layout (Text Left | Image Right) -->
+        <section class="hero">
+            <div class="hero-text">
+                <h1 class="hero-title">Hello, I'm <span class="highlight">[Name]</span></h1>
+                <p class="hero-subtitle">Machine Learning & Computer Vision Engineer</p>
+                <p class="hero-bio">
+                    Specializing in Edge AI optimization and embedded systems.
+                    Building efficient AI solutions for constrained hardware.
+                </p>
+                <div class="hero-actions">
+                    <a href="mailto:email@example.com" class="btn">Contact Me</a>
+                    <!-- Add Resume/CV button here later -->
+                </div>
+            </div>
+
+            <div class="hero-image-container">
+                <!-- Placeholder for Profile Picture -->
+                <!-- Replace 'src' with your actual image path -->
+                <div class="profile-placeholder">
+                    <span>Your Photo</span>
+                </div>
+                <!-- <img src="public/images/profile.jpg" alt="Profile" class="profile-img"> -->
+            </div>
+        </section>
+
+        <!-- EASY TO EXTEND: Copy this block to add a new section -->
+        <!-- 
         <section class="section">
-            <div class="card">
-                <h2>Hello, I'm [Name]</h2>
-                <p>Focusing on [Specialization, e.g., Edge AI optimization].</p>
-                <div style="margin-top: 1rem;">
-                    <a href="#projects" class="btn">View My Work</a>
-                </div>
-            </div>
-        </section>
+            <h2>New Section Title</h2>
+            <p>Content goes here...</p>
+        </section> 
+        -->
 
-        <!-- Expertise Section (3 Columns) -->
-        <section class="section" id="expertise">
-            <h2>Expertise</h2>
-            <div class="grid-3">
-                <div class="card">
-                    <h3>Core Tech</h3>
-                    <p>[Skill 1, Skill 2, Skill 3]</p>
-                </div>
-                <div class="card">
-                    <h3>Edge AI</h3>
-                    <p>[Skill 1, Skill 2, Skill 3]</p>
-                </div>
-                <div class="card">
-                    <h3>Academic</h3>
-                    <p>[Skill 1, Skill 2, Skill 3]</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Projects Highlight Section -->
-        <section class="section" id="projects">
-            <h2>Featured Projects</h2>
-            <div class="grid-2">
-                <div class="card">
-                    <h3>[Project Name A]</h3>
-                    <p>Brief description of project A.</p>
-                </div>
-                <div class="card">
-                    <h3>[Project Name B]</h3>
-                    <p>Brief description of project B.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Ventures Section -->
-        <section class="section" id="ventures">
-            <h2>Entrepreneurial Ventures</h2>
-            <div class="card">
-                <h3>[Business Name]</h3>
-                <p>Description of business systems and role.</p>
-            </div>
-        </section>
-
-        <!-- Career Roadmap (Timeline) -->
-        <section class="section" id="roadmap">
-            <h2>Career Roadmap</h2>
-            <div class="timeline">
-                <div class="timeline-item">
-                    <h3>Near Future</h3>
-                    <p>[Goal: Location/Role]</p>
-                </div>
-                <div class="timeline-item">
-                    <h3>Target Industry</h3>
-                    <p>[Goal: Industry/Sector]</p>
-                </div>
-                <div class="timeline-item">
-                    <h3>Long-term</h3>
-                    <p>[Goal: Final Destination]</p>
-                </div>
-            </div>
-        </section>
     </main>
 
-    <footer id="contact">
+    <!-- Footer -->
+    <footer>
         <p>&copy; 2026 My Profile</p>
     </footer>
 

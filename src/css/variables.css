@@ -2,23 +2,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-    /* Professional Tech Palette (Deep Navy & Emerald/Blue) */
-    --primary-color: #2563eb;
-    /* Vibrant Blue */
-    --primary-dark: #1e40af;
+    /* Executive Dark Theme */
+    /* Primary Background: Deep Navy/Charcoal */
+    --bg-color: #0f172a;
+
+    /* Secondary Background: Slightly lighter for cards/sections */
+    --bg-card: #1e293b;
+
+    /* Text Colors */
+    --text-main: #f8fafc;
+    /* Almost White */
+    --text-muted: #94a3b8;
+    /* Muted Blue-Grey */
+
+    /* Accents */
+    --primary-color: #38bdf8;
+    /* Light Blue/Cyan (Tech vibe) */
+    --primary-dark: #0ea5e9;
     /* Darker Blue for hover */
-    --secondary-color: #10b981;
-    /* Emerald Green (Accent) */
-
-    --bg-color: #f8fafc;
-    /* Very light gray/blue tint background */
-    --bg-card: #ffffff;
-    /* White for cards */
-
-    --text-main: #1e293b;
-    /* Slate 800 - High contrast text */
-    --text-muted: #64748b;
-    /* Slate 500 - Secondary text */
+    --accent-color: #fca5a5;
+    /* Soft Red/Pink for subtle highlights (optional) */
 
     --white: #ffffff;
 
@@ -26,26 +29,11 @@
     --spacing-sm: 0.5rem;
     --spacing-md: 1.5rem;
     --spacing-lg: 3rem;
-    --spacing-xl: 5rem;
 
-    /* Effects */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    /* Border Radius */
+    --radius-md: 8px;
+    --radius-lg: 16px;
 
-    --radius-md: 0.5rem;
-    --radius-lg: 1rem;
-
+    /* Font */
     --font-main: 'Inter', sans-serif;
-}
-
-[data-theme="dark"] {
-    --bg-color: #0f172a;
-    /* Slate 900 */
-    --bg-card: #1e293b;
-    /* Slate 800 */
-    --text-main: #f8fafc;
-    /* Slate 50 */
-    --text-muted: #94a3b8;
-    /* Slate 400 */
 }
