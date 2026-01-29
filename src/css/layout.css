@@ -8,11 +8,36 @@ footer {
 }
 
 main {
-    max-width: 800px;
+    max-width: 900px;
+    /* Increased max-width for better grid layout */
     margin: 2rem auto;
     padding: 0 var(--spacing-md);
 }
 
 .section {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 4rem;
+    /* More spacing between major sections */
+}
+
+/* Grids */
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+}
+
+@media (min-width: 768px) {
+    .grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
