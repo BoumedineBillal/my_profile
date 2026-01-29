@@ -4,59 +4,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>B.B. | Engineer</title>
+    <title>My Profile</title>
     <link rel="stylesheet" href="src/css/main.css">
 </head>
 
 <body>
 
-    <!-- Floating Navbar -->
-    <div class="nav-wrapper">
-        <nav class="nav-glass">
-            <a href="#" class="nav-brand">B.B.</a>
-            <a href="#" class="nav-item active">Home</a>
-            <!-- Expansion: <a href="#projects" class="nav-item">Projects</a> -->
-        </nav>
-    </div>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <!-- Simple Initials/Logo -->
+            <div class="logo">B.B.</div>
+            <ul class="nav-links">
+                <li><a href="#" class="active">Home</a></li>
+                <!-- <li><a href="pages/projects.html">Projects</a></li> -->
+            </ul>
+            <!-- REMOVED Redundant Contact Button -->
+        </div>
+    </nav>
 
-    <!-- Main Content -->
-    <main>
-        <section class="hero-wrapper">
-            <div class="container hero-grid">
-
-                <!-- Left: Content -->
-                <div class="hero-content">
-                    <span class="hero-overline">01. WELCOME</span>
-                    <h1 class="hero-title">
-                        Building Logic <br>
-                        Into Reality.
-                    </h1>
-                    <p class="hero-bio">
-                        Machine Learning & Computer Vision Engineer specializing in Edge AI.
-                        I bridge the gap between complex models and constrained hardware.
-                    </p>
-                    <a href="mailto:email@example.com" class="btn-tech">
-                        <span>Let's Talk</span>
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
-                    </a>
+    <main class="container">
+        <section class="hero">
+            <div class="hero-text">
+                <h1 class="hero-title">
+                    <span class="greeting">Hello, I am</span>
+                    <span class="highlight">[Name]</span>
+                </h1>
+                <p class="hero-subtitle">Machine Learning & Computer Vision Engineer</p>
+                <p class="hero-bio">
+                    Specializing in Edge AI optimization and embedded systems.
+                    Building efficient AI solutions for constrained hardware.
+                </p>
+                <div class="hero-actions">
+                    <a href="mailto:email@example.com" class="btn">Contact Me</a>
                 </div>
+            </div>
 
-                <!-- Right: Tech Frame Image -->
-                <div class="hero-image">
-                    <div class="img-tech-frame">
-                        <div class="img-placeholder">
-                            <!-- Drag your image to public/images/ and link here -->
-                            <span>[Profile_Pic.jpg]</span>
-                        </div>
-                    </div>
+            <div class="hero-image-container">
+                <div class="profile-placeholder">
+                    <span>[Photo]</span>
                 </div>
-
             </div>
         </section>
     </main>
+
+    <footer>
+        <p>&copy; 2026 My Profile</p>
+    </footer>
 
     <script type="module" src="src/js/main.js"></script>
 </body>

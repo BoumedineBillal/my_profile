@@ -1,48 +1,25 @@
 /* Google Fonts Import */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-    /* 
-     * THEME: Deep Space Engineer
-     * Concept: Dark, layered, rich, professional.
-     */
+    /* Executive Dark Theme - Polished */
+    --bg-color: #0f172a;
+    --bg-card: #1e293b;
 
-    /* Backgrounds */
-    --bg-deep: #030712;
-    /* Almost pure black/blue */
-    --bg-surface: #0f172a;
-    /* Deep slate for cards/nav */
-    --bg-glass: rgba(15, 23, 42, 0.7);
-    /* Glassmorphism base */
+    /* Text */
+    --text-main: #ffffff;
+    /* Pure White for max contrast */
+    --text-muted: #94a3b8;
+    /* Muted Blue-Grey */
+    --text-highlight: #38bdf8;
+    /* Primary Cyan */
 
-    /* Typography Colors */
-    --text-primary: #f8fafc;
-    /* Brighter white for headings */
-    --text-secondary: #94a3b8;
-    /* Muted slate for body text */
-    --text-accent: #38bdf8;
-    /* Sky blue for code/highlights */
+    /* Accents */
+    --primary-color: #38bdf8;
+    --primary-dark: #0284c7;
+    --glow-color: rgba(56, 189, 248, 0.15);
+    /* Subtle glow */
 
-    /* Brand Colors */
-    --primary: #3b82f6;
-    /* Royal Blue - Trust/Engineering */
-    --glow: #6366f1;
-    /* Indigo - For subtle lighting */
-
-    /* Spacing System */
-    --space-xs: 0.5rem;
-    --space-sm: 1rem;
-    --space-md: 2rem;
-    --space-lg: 4rem;
-    --space-xl: 8rem;
-
-    /* Effects */
-    --glass-blur: blur(12px);
-    --border-subtle: 1px solid rgba(255, 255, 255, 0.08);
-    --shadow-glow: 0 0 40px -10px rgba(59, 130, 246, 0.3);
-
-    /* Fonts */
-    --font-sans: 'Inter', sans-serif;
-    --font-mono: 'IBM Plex Mono', monospace;
-    /* Tech feel */
+    --spacing-md: 1.5rem;
+    --font-main: 'Inter', sans-serif;
 }
