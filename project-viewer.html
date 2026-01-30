@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Viewer | Billal Boumedine</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 950: '#0f172a' },
+                        cyan: { 400: '#22d3ee', 500: '#06b6d4' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    typography: (theme) => ({
+                        DEFAULT: {
+                            css: {
+                                color: theme('colors.slate.300'),
+                                h1: { color: theme('colors.white'), fontWeight: '800' },
+                                h2: { color: theme('colors.white'), marginTop: '2em' },
+                                h3: { color: theme('colors.cyan.400') },
+                                strong: { color: theme('colors.white') },
+                                code: { color: theme('colors.cyan.300') },
+                                blockquote: {
+                                    borderLeftColor: theme('colors.cyan.500'),
+                                    color: theme('colors.slate.400'),
+                                    fontStyle: 'italic'
+                                },
+                            }
+                        }
+                    })
+                }
+            },
+            plugins: [
+                // Minimal typography plugin simulation for standard elements
+            ]
+        }
+    </script>
+
+    <!-- Libraries -->
+    <!-- Marked.js for Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Prism.js for Syntax Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+
+    <!-- KaTeX for Math -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <style type="text/tailwindcss">
+        /* Custom Markdown Styles to mimic 'prose' */
+        .markdown-body h1 { @apply text-4xl md:text-5xl font-bold mb-6 mt-2 text-white tracking-tight; }
+        .markdown-body h2 { @apply text-2xl md:text-3xl font-bold mb-4 mt-12 text-white border-b border-slate-800 pb-2; }
+        .markdown-body h3 { @apply text-xl font-semibold mb-3 mt-8 text-cyan-400; }
+        .markdown-body p { @apply mb-6 text-lg leading-relaxed text-slate-300; }
+        .markdown-body ul { @apply list-disc list-outside mb-6 pl-6 text-slate-300; }
+        .markdown-body ol { @apply list-decimal list-outside mb-6 pl-6 text-slate-300; }
+        .markdown-body blockquote { @apply border-l-4 border-cyan-500 pl-6 py-2 my-8 bg-slate-900/50 rounded-r-lg italic text-slate-400; }
+        .markdown-body img { @apply rounded-xl border border-slate-700/50 shadow-2xl my-8 w-full; }
+        .markdown-body code { @apply font-mono text-sm bg-slate-800/80 px-1.5 py-0.5 rounded text-cyan-300; }
+        .markdown-body pre { @apply bg-[#2d2d2d] p-0 rounded-lg overflow-x-auto mb-8 border border-slate-700/50 !important; }
+        .markdown-body pre code { @apply bg-transparent p-0 text-inherit; }
+        
+        /* Math Display override */
+        .katex-display { @apply my-8 overflow-x-auto overflow-y-hidden py-2; }
+    </style>
+</head>
+
+<body
+    class="bg-slate-950 text-slate-50 font-sans min-h-screen flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 w-full z-50 backdrop-blur-md border-b border-white/5 bg-slate-950/80">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="index.html"
+                class="flex items-center gap-2 group cursor-pointer text-cyan-400 font-mono font-semibold">
+                <span class="text-cyan-600">&lt;</span>
+                <span class="group-hover:text-white transition-colors">BACK_TO_HOME</span>
+            </a>
+            <div class="text-xs font-mono text-slate-500">PROJECT_VIEWER_V1.0</div>
+        </div>
+    </nav>
+
+    <!-- Content Area (Medium Style) -->
+    <main class="flex-grow w-full max-w-3xl mx-auto px-6 py-12 md:py-20 relative z-10">
+
+        <!-- Loading State -->
+        <div id="loading" class="flex flex-col items-center justify-center py-20 space-y-4">
+            <div class="w-12 h-12 border-4 border-slate-800 border-t-cyan-500 rounded-full animate-spin"></div>
+            <p class="font-mono text-sm text-cyan-500 animate-pulse">LOADING_DATA_STREAM...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="hidden text-center py-20">
+            <h2 class="text-2xl font-bold text-red-500 mb-2">ERROR: 404_DATA_NOT_FOUND</h2>
+            <p class="text-slate-400">The requested project module could not be loaded.</p>
+            <a href="index.html" class="inline-block mt-6 text-cyan-400 hover:text-white underline">Return Home</a>
+        </div>
+
+        <!-- Markdown Container -->
+        <article id="content" class="markdown-body opacity-0 transition-opacity duration-500 block">
+            <!-- Content Injected Here -->
+        </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/50 bg-slate-950/50 backdrop-blur-sm py-8 text-center">
+        <p class="text-slate-500 text-sm font-mono flex items-center justify-center gap-2">
+            <span>ENG.boumedine_billal</span>
+            <span class="text-slate-700">|</span>
+            <span>END_OF_FILE</span>
+        </p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const params = new URLSearchParams(window.location.search);
+            const projectId = params.get('id');
+
+            const loadingEl = document.getElementById('loading');
+            const contentEl = document.getElementById('content');
+            const errorEl = document.getElementById('error');
+
+            if (!projectId) {
+                showError();
+                return;
+            }
+
+            try {
+                // 1. Fetch Markdown
+                const response = await fetch(`projects/${projectId}/index.md`);
+                if (!response.ok) throw new Error('File not found');
+                const text = await response.text();
+
+                // 2. Configure Marked Renderer for Image Paths
+                const renderer = new marked.Renderer();
+                const originalImageRenderer = renderer.image;
+
+                renderer.image = function (href, title, text) {
+                    // Check if absolute path (http/https)
+                    if (!href.startsWith('http') && !href.startsWith('//')) {
+                        // Rewrite relative path: assets/demo.jpg -> projects/p4jit/assets/demo.jpg
+                        href = `projects/${projectId}/${href}`;
+                    }
+                    return `<img src="${href}" alt="${text}" title="${title || ''}" class="img-fluid">`;
+                };
+
+                // 3. Parse Markdown
+                marked.setOptions({ renderer: renderer });
+                contentEl.innerHTML = marked.parse(text);
+
+                // 4. Highlight Code (Prism)
+                Prism.highlightAllUnder(contentEl);
+
+                // 5. Render Math (KaTeX)
+                renderMathInElement(contentEl, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false }
+                    ],
+                    throwOnError: false
+                });
+
+                // 6. Reveal
+                loadingEl.classList.add('hidden');
+                contentEl.classList.remove('opacity-0');
+
+            } catch (err) {
+                console.error(err);
+                showError();
+            }
+
+            function showError() {
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+
+</html>

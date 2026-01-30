@@ -138,13 +138,14 @@
 
             <!-- Actions -->
             <div class="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4">
-                <a href="mailto:email@example.com"
-                    class="group relative px-8 py-3.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 rounded-lg overflow-hidden transition-all border border-cyan-500/30 hover:border-cyan-400 hover:shadow-[0_0_20px_-5px_rgba(34,211,238,0.4)] backdrop-blur-sm">
-                    <span class="relative z-10 font-semibold tracking-wide">CONTACT_ME</span>
-                </a>
-                <a href="#"
-                    class="group px-8 py-3.5 text-slate-400 hover:text-white border border-transparent hover:border-slate-700/50 rounded-lg transition-all font-medium">
-                    View Resume
+                <a href="#featured-projects"
+                    class="group relative px-8 py-3.5 bg-cyan-500 text-slate-950 rounded-lg overflow-hidden transition-all hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.6)] font-bold tracking-wide flex items-center gap-2">
+                    <span class="relative z-10">EXPLORE_WORK</span>
+                    <svg class="w-5 h-5 group-hover:translate-y-1 transition-transform" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                    </svg>
                 </a>
             </div>
         </div>
@@ -183,22 +184,28 @@
         </div>
     </main>
 
-    <!-- Detailed Features / Sections Placeholder -->
-    <!-- 
-    <section class="max-w-7xl mx-auto px-6 py-20 border-t border-slate-800/50">
-        <h2 class="text-2xl font-bold mb-8 flex items-center gap-3">
-            <span class="text-cyan-400 text-lg">01.</span> Expertise
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            ...
+    <!-- Featured Projects Section -->
+    <section id="featured-projects" class="max-w-7xl mx-auto px-6 py-24 relative z-10">
+        <!-- Section Heading -->
+        <div class="mb-16">
+            <h2 class="text-3xl md:text-4xl font-bold text-white relative inline-block">
+                Featured Projects
+                <span
+                    class="absolute -bottom-2 left-0 w-2/3 h-1 bg-gradient-to-r from-cyan-400 to-transparent shadow-[0_0_10px_#22d3ee]"></span>
+            </h2>
+        </div>
+
+        <!-- High-Performance Image Grid (Rendered via JS) -->
+        <div id="project-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- Content injected by src/js/projects.js -->
         </div>
     </section>
-    -->
 
+    <!-- Footer -->
     <footer class="border-t border-slate-800/50 bg-slate-950/50 backdrop-blur-sm mt-auto">
         <div class="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row justify-between items-center gap-6">
             <p class="text-slate-500 text-sm font-mono">
-                © 2026 ENG.[boumedine billal] // SYSTEM.ONLINE
+                © 2026 ENG.boumedine_billal // SYSTEM.ONLINE
             </p>
 
             <!-- Social Icons (SVG) -->
@@ -221,8 +228,6 @@
         </div>
     </footer>
 
-    <!-- Clean Main JS import (if needed) -->
-    <!-- <script type="module" src="src/js/main.js"></script> -->
     <!-- Boot Animation Overlay -->
     <div id="boot-screen" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center cursor-default">
         <div class="font-mono text-cyan-500 text-lg md:text-xl font-bold tracking-wider">
@@ -271,6 +276,9 @@
             typeWriter();
         });
     </script>
+
+    <!-- Render Projects Grid -->
+    <script src="src/js/projects.js"></script>
 </body>
 
 </html>
