@@ -80,7 +80,12 @@
         .markdown-body blockquote { @apply border-l-4 border-cyan-500 pl-6 py-2 my-8 bg-slate-900/50 rounded-r-lg italic text-slate-400; }
         .markdown-body img { @apply rounded-xl border border-slate-700/50 shadow-2xl my-8 w-full; }
         .markdown-body code { @apply font-mono text-sm bg-slate-800/80 px-1.5 py-0.5 rounded text-cyan-300; }
-        .markdown-body pre { @apply bg-[#2d2d2d] p-0 rounded-lg overflow-x-auto mb-8 border border-slate-700/50 !important; }
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; background-color: #0f172a; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #22d3ee; }
+
+        .markdown-body pre { @apply bg-transparent p-0 m-0 border-none !important; } /* Reset for Wrapper */
         .markdown-body pre code { @apply bg-transparent p-0 text-inherit; }
         
         /* Math Display override */
@@ -92,7 +97,7 @@
     class="bg-slate-950 text-slate-50 font-sans min-h-screen flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
 
     <!-- Navigation -->
-    <nav class="sticky top-0 w-full z-50 backdrop-blur-md border-b border-white/5 bg-slate-950/80">
+    <nav class="absolute top-0 w-full z-10 backdrop-blur-md border-b border-white/5 bg-slate-950/80">
         <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
             <a href="index.html"
                 class="flex items-center gap-2 group cursor-pointer text-cyan-400 font-mono font-semibold">
@@ -104,7 +109,7 @@
     </nav>
 
     <!-- Content Area (Medium Style) -->
-    <main class="flex-grow w-full max-w-3xl mx-auto px-6 py-12 md:py-20 relative z-10">
+    <main class="flex-grow w-full max-w-3xl mx-auto px-6 pt-32 pb-20 relative z-0">
 
         <!-- Loading State -->
         <div id="loading" class="flex flex-col items-center justify-center py-20 space-y-4">
@@ -174,29 +179,82 @@
                 // 2. Configure Marked Renderer for Image Paths
                 const renderer = new marked.Renderer();
 
-                renderer.image = function (href, title, text) {
-                    // Safety: Check if href exists and is a string
-                    if (!href || typeof href !== 'string') {
+                renderer.image = function (token) {
+                    // Extract properties from token object (Marked.js update)
+                    let href = token.href;
+                    const title = token.title;
+                    const text = token.text;
+
+                    // Safety: Check if href exists
+                    if (!href) {
                         console.warn("[Viewer] Image tag missing href attribute");
                         return '';
                     }
 
-                    // Check if absolute path (http/https)
-                    if (!href.startsWith('http') && !href.startsWith('//')) {
-                        // Rewrite relative path: assets/demo.jpg -> projects/p4jit/assets/demo.jpg
-                        const newHref = `projects/${projectId}/${href}`;
-                        // console.log(`[Viewer] Rewrote Image: ${href} -> ${newHref}`);
-                        href = newHref;
+                    // Logic: If path starts with 'assets/', it's a local project asset
+                    if (href.startsWith('assets/')) {
+                        // Prepend projects/[id]/
+                        href = `projects/${projectId}/${href}`;
+                        console.log(`[Viewer] Rewrote Local Asset: ${token.href} -> ${href}`);
                     }
-                    return `<img src="${href}" alt="${text}" title="${title || ''}" class="img-fluid">`;
+                    // Fallback logic for relative paths
+                    else if (!href.startsWith('http') && !href.startsWith('//') && !href.startsWith('/')) {
+                        href = `projects/${projectId}/${href}`;
+                    }
+
+                    // Return with specific Tailwind classes
+                    return `<img src="${href}" alt="${text}" title="${title || ''}" class="rounded-xl border border-slate-700/50 shadow-2xl my-8 w-full">`;
                 };
 
                 // 3. Parse Markdown
                 marked.setOptions({ renderer: renderer });
                 contentEl.innerHTML = marked.parse(text);
 
-                // 4. Highlight Code (Prism)
-                // Short timeout to ensure DOM update
+                // Post-Processing: Fix raw HTML <img> tags
+                // This allows syntax like <img src="assets/demo.jpg"> to work
+                contentEl.querySelectorAll('img').forEach(img => {
+                    const src = img.getAttribute('src');
+                    if (src && src.startsWith('assets/')) {
+                        const newSrc = `projects/${projectId}/${src}`;
+                        img.setAttribute('src', newSrc);
+                        console.log(`[Viewer] Rewrote HTML Asset: ${src} -> ${newSrc}`);
+                    }
+                });
+
+                // Post-Processing: Decorate Code Blocks (Terminal Style)
+                contentEl.querySelectorAll('pre').forEach(pre => {
+                    // 1. Create Wrapper
+                    const wrapper = document.createElement('div');
+                    wrapper.className = "my-8 rounded-lg overflow-hidden border border-slate-700/50 bg-[#2d2d2d] shadow-2xl";
+
+                    // 2. Create Header
+                    const header = document.createElement('div');
+                    header.className = "flex items-center px-4 py-1.5 bg-[#1e1e1e] border-b border-slate-700/50";
+
+                    // Language Label (Text Only)
+                    const code = pre.querySelector('code');
+                    let lang = 'TEXT';
+                    if (code && code.className) {
+                        const match = code.className.match(/language-(\w+)/);
+                        if (match) lang = match[1].toUpperCase();
+                    }
+
+                    const langBadge = document.createElement('div');
+                    langBadge.className = "text-cyan-400 font-mono text-[10px] font-bold uppercase tracking-wider select-none opacity-80";
+                    langBadge.innerText = lang;
+
+                    header.appendChild(langBadge);
+
+                    // 3. Setup Pre
+                    pre.className = "custom-scrollbar overflow-x-auto px-6 py-4 text-sm leading-relaxed";
+
+                    // 4. Assemble
+                    pre.parentNode.insertBefore(wrapper, pre);
+                    wrapper.appendChild(header);
+                    wrapper.appendChild(pre);
+                });
+
+                // 4. Highlight Code (Prism) - Wait for DOM updates
                 setTimeout(() => {
                     Prism.highlightAllUnder(contentEl);
 
