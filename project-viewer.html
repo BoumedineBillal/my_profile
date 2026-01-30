@@ -145,25 +145,48 @@
             const errorEl = document.getElementById('error');
 
             if (!projectId) {
+                console.error("No Project ID provided in URL");
                 showError();
                 return;
             }
 
+            const markdownPath = `projects/${projectId}/index.md`;
+            console.log(`[Viewer] Fetching Project: ${projectId}`);
+            console.log(`[Viewer] Target URL: ${markdownPath}`);
+
             try {
                 // 1. Fetch Markdown
-                const response = await fetch(`projects/${projectId}/index.md`);
-                if (!response.ok) throw new Error('File not found');
+                const response = await fetch(markdownPath);
+
+                if (!response.ok) {
+                    console.error(`[Viewer] Fetch Failed: ${response.status} ${response.statusText}`);
+                    throw new Error(`File not found: ${markdownPath}`);
+                }
+
                 const text = await response.text();
+
+                // Safety Check: Ensure we actually got text back
+                if (typeof text !== 'string' || text.trim().length === 0) {
+                    console.error("[Viewer] Received empty or invalid text content");
+                    throw new Error("Empty content received");
+                }
 
                 // 2. Configure Marked Renderer for Image Paths
                 const renderer = new marked.Renderer();
-                const originalImageRenderer = renderer.image;
 
                 renderer.image = function (href, title, text) {
+                    // Safety: Check if href exists and is a string
+                    if (!href || typeof href !== 'string') {
+                        console.warn("[Viewer] Image tag missing href attribute");
+                        return '';
+                    }
+
                     // Check if absolute path (http/https)
                     if (!href.startsWith('http') && !href.startsWith('//')) {
                         // Rewrite relative path: assets/demo.jpg -> projects/p4jit/assets/demo.jpg
-                        href = `projects/${projectId}/${href}`;
+                        const newHref = `projects/${projectId}/${href}`;
+                        // console.log(`[Viewer] Rewrote Image: ${href} -> ${newHref}`);
+                        href = newHref;
                     }
                     return `<img src="${href}" alt="${text}" title="${title || ''}" class="img-fluid">`;
                 };
@@ -173,23 +196,26 @@
                 contentEl.innerHTML = marked.parse(text);
 
                 // 4. Highlight Code (Prism)
-                Prism.highlightAllUnder(contentEl);
+                // Short timeout to ensure DOM update
+                setTimeout(() => {
+                    Prism.highlightAllUnder(contentEl);
 
-                // 5. Render Math (KaTeX)
-                renderMathInElement(contentEl, {
-                    delimiters: [
-                        { left: '$$', right: '$$', display: true },
-                        { left: '$', right: '$', display: false }
-                    ],
-                    throwOnError: false
-                });
+                    // 5. Render Math (KaTeX)
+                    renderMathInElement(contentEl, {
+                        delimiters: [
+                            { left: '$$', right: '$$', display: true },
+                            { left: '$', right: '$', display: false }
+                        ],
+                        throwOnError: false
+                    });
+                }, 0);
 
                 // 6. Reveal
                 loadingEl.classList.add('hidden');
                 contentEl.classList.remove('opacity-0');
 
             } catch (err) {
-                console.error(err);
+                console.error("[Viewer] Critical Error:", err);
                 showError();
             }
 
