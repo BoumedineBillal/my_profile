@@ -1,51 +1,23 @@
 const projects = [
     {
-        id: "p4jit-optimization",
-        title: "ESP32-P4 JIT Optimization",
-        desc: "Dynamic Python-to-Assembly JIT compiler using custom NPU acceleration.",
-        img: "public/assets/projects/p4jit.jpg",
-        link: "project-viewer.html?id=p4jit-optimization"
+        id: "yolo26n-esp32p4",
+        title: "World’s First YOLO26n on ESP32-P4",
+        desc: "Adapting Training Pipelines for QAT and Graph Optimization to Achieve 36.5% mAP at 512px Resolution with 1.7s Latency",
+        img: "projects/yolo26n-esp32p4/assets/yolo26n-esp32p4.jpg",
+        link: "project-viewer.html?id=yolo26n-esp32p4"
     },
     {
-        id: "atomic_mirror",
-        title: "Atomic Mirror [Coming Soon]",
-        desc: "Real-time AR reflection rendering system using ray-tracing techniques.",
-        img: "public/assets/projects/atomic_mirror.jpg",
+        id: "coming_soon",
+        title: "Coming Soon",
+        desc: "Coming Soon",
+        img: "public/assets/projects/coming_soon.jpg",
         link: "#"
     },
     {
-        id: "vlm_optim",
-        title: "VLM Optimization [Coming Soon]",
-        desc: "Vision-Language Model quantization and pruning for edge execution.",
-        img: "public/assets/projects/vlm_optim.jpg",
-        link: "#"
-    },
-    {
-        id: "yolo_edge",
-        title: "YOLO Edge [Coming Soon]",
-        desc: "Custom YOLO implementation for ultra-low power consumption.",
-        img: "public/assets/projects/yolo_edge.jpg",
-        link: "#"
-    },
-    {
-        id: "jit_compiler",
-        title: "JIT Compiler [Coming Soon]",
-        desc: "Experimental Just-In-Time compilation framework.",
-        img: "public/assets/projects/jit_compiler.jpg",
-        link: "#"
-    },
-    {
-        id: "riscv_vision",
-        title: "RISC-V Vision [Coming Soon]",
-        desc: "Vector extension integration for OpenCV on RISC-V cores.",
-        img: "public/assets/projects/riscv_vision.jpg",
-        link: "#"
-    },
-    {
-        id: "embedded_ai",
-        title: "Embedded AI [Coming Soon]",
-        desc: "TinyML framework for Cortex-M microcontroller series.",
-        img: "public/assets/projects/embedded_ai.jpg",
+        id: "coming_soon",
+        title: "Coming Soon",
+        desc: "Coming Soon",
+        img: "public/assets/projects/coming_soon.jpg",
         link: "#"
     }
 ];

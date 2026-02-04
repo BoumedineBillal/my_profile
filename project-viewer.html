@@ -13,6 +13,11 @@
         href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
 
+    <!-- Prism.js Theme (Tomorrow Night) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <!-- KaTeX CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -52,44 +57,37 @@
         }
     </script>
 
-    <!-- Libraries -->
-    <!-- Marked.js for Markdown -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-    <!-- Prism.js for Syntax Highlighting -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-
-    <!-- KaTeX for Math -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
-
+    <!-- Libraries (Moved to Body/Head with newer versions) -->
     <style type="text/tailwindcss">
         /* Custom Markdown Styles to mimic 'prose' */
         .markdown-body h1 { @apply text-4xl md:text-5xl font-bold mb-6 mt-2 text-white tracking-tight; }
         .markdown-body h2 { @apply text-2xl md:text-3xl font-bold mb-4 mt-12 text-white border-b border-slate-800 pb-2; }
         .markdown-body h3 { @apply text-xl font-semibold mb-3 mt-8 text-cyan-400; }
         .markdown-body p { @apply mb-6 text-lg leading-relaxed text-slate-300; }
+        .markdown-body a { @apply text-indigo-400 font-medium underline underline-offset-4 decoration-slate-700 transition-all duration-300 hover:text-white hover:decoration-cyan-400; }
         .markdown-body ul { @apply list-disc list-outside mb-6 pl-6 text-slate-300; }
         .markdown-body ol { @apply list-decimal list-outside mb-6 pl-6 text-slate-300; }
         .markdown-body blockquote { @apply border-l-4 border-cyan-500 pl-6 py-2 my-8 bg-slate-900/50 rounded-r-lg italic text-slate-400; }
         .markdown-body img { @apply rounded-xl border border-slate-700/50 shadow-2xl my-8 w-full; }
-        .markdown-body code { @apply font-mono text-sm bg-slate-800/80 px-1.5 py-0.5 rounded text-cyan-300; }
+        .markdown-body :not(pre) > code { @apply font-mono text-sm bg-slate-800/80 px-1.5 py-0.5 rounded text-cyan-300; }
         /* Custom Scrollbar */
         .custom-scrollbar::-webkit-scrollbar { height: 8px; background-color: #0f172a; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #22d3ee; }
 
         .markdown-body pre { @apply bg-transparent p-0 m-0 border-none !important; } /* Reset for Wrapper */
-        .markdown-body pre code { @apply bg-transparent p-0 text-inherit; }
+        .markdown-body pre code { @apply bg-transparent p-0 text-inherit; } /* Restored text-inherit for Prism */
         
         /* Math Display override */
         .katex-display { @apply my-8 overflow-x-auto overflow-y-hidden py-2; }
+
+        /* Table Styles */
+        .markdown-body table { @apply w-full text-left border-collapse; }
+        .markdown-body thead { @apply bg-white/5 text-cyan-400; }
+        .markdown-body th { @apply p-4 font-mono font-bold border-b border-white/10 uppercase tracking-wider text-sm; }
+        .markdown-body td { @apply p-4 border-b border-white/5 text-slate-300 text-sm; }
+        .markdown-body tr { @apply transition-colors duration-200; }
+        .markdown-body tbody tr:hover { @apply bg-white/5; }
     </style>
 </head>
 
@@ -129,6 +127,23 @@
             <!-- Content Injected Here -->
         </article>
 
+        <!-- Contact/Feedback Section -->
+        <hr class="border-white/5 my-20">
+
+        <div
+            class="bg-slate-900/40 border border-slate-800 rounded-xl p-8 hover:border-cyan-500/50 transition-colors duration-500 group">
+            <h3 class="font-bold text-xl text-white mb-2 group-hover:text-cyan-400 transition-colors">Have a question or
+                feedback?</h3>
+            <p class="text-slate-400 text-sm leading-relaxed mb-4">
+                Since this is a static site, there is no comment section. However, I’d love to hear your thoughts or
+                answer any technical questions about this project.
+            </p>
+            <a href="mailto:boumedinebillal@gmail.com"
+                class="text-indigo-400 font-medium underline underline-offset-4 decoration-slate-700 transition-all duration-300 hover:text-white hover:decoration-cyan-400">
+                boumedinebillal@gmail.com
+            </a>
+        </div>
+
     </main>
 
     <!-- Footer -->
@@ -139,6 +154,17 @@
             <span>END_OF_FILE</span>
         </p>
     </footer>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-nasm.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-llvm.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
@@ -168,70 +194,141 @@
                     throw new Error(`File not found: ${markdownPath}`);
                 }
 
-                const text = await response.text();
+                let text = await response.text();
 
-                // Safety Check: Ensure we actually got text back
-                if (typeof text !== 'string' || text.trim().length === 0) {
-                    console.error("[Viewer] Received empty or invalid text content");
+                // 2. Strict Metadata Extraction (Top of file only)
+                // Default values
+                let author = 'Billal Boumedine';
+                let date = 'Latest Update';
+
+                // Use strict regex with multiline flag to ensure start-of-line matching
+                const authorMatch = text.match(/^author:\s*(.*)/m);
+                const dateMatch = text.match(/^date:\s*(.*)/m);
+
+                if (authorMatch) {
+                    author = authorMatch[1].trim();
+                    // Remove the specific line
+                    text = text.replace(authorMatch[0], '');
+                }
+
+                if (dateMatch) {
+                    date = dateMatch[1].trim();
+                    // Remove the specific line
+                    text = text.replace(dateMatch[0], '');
+                }
+
+                // Cleanup: Remove leading newlines left by extraction
+                text = text.trim();
+
+                // Calculate Read Time
+                const wordCount = text.replace(/[#*`]/g, '').split(/\s+/).length;
+                const readTime = Math.ceil(wordCount / 200);
+
+                // Safety Check
+                if (typeof text !== 'string' || text.length === 0) {
                     throw new Error("Empty content received");
                 }
 
-                // 2. Configure Marked Renderer for Image Paths
+                // 3. Configure Renderer
                 const renderer = new marked.Renderer();
 
                 renderer.image = function (token) {
-                    // Extract properties from token object (Marked.js update)
                     let href = token.href;
                     const title = token.title;
                     const text = token.text;
 
-                    // Safety: Check if href exists
-                    if (!href) {
-                        console.warn("[Viewer] Image tag missing href attribute");
-                        return '';
-                    }
+                    if (!href) return '';
 
-                    // Logic: If path starts with 'assets/', it's a local project asset
                     if (href.startsWith('assets/')) {
-                        // Prepend projects/[id]/
                         href = `projects/${projectId}/${href}`;
-                        console.log(`[Viewer] Rewrote Local Asset: ${token.href} -> ${href}`);
-                    }
-                    // Fallback logic for relative paths
-                    else if (!href.startsWith('http') && !href.startsWith('//') && !href.startsWith('/')) {
+                    } else if (!href.startsWith('http') && !href.startsWith('//') && !href.startsWith('/')) {
                         href = `projects/${projectId}/${href}`;
                     }
 
-                    // Return with specific Tailwind classes
-                    return `<img src="${href}" alt="${text}" title="${title || ''}" class="rounded-xl border border-slate-700/50 shadow-2xl my-8 w-full">`;
+                    const imgTag = `<img src="${href}" alt="${text}" title="${title || ''}" class="rounded-xl border border-slate-700 shadow-2xl max-w-full h-auto">`;
+
+                    if (title) {
+                        return `
+                        <figure class="my-12 mx-auto text-center">
+                            ${imgTag}
+                            <figcaption class="mt-4 text-slate-500 italic text-sm font-mono leading-snug">
+                                ${title}
+                            </figcaption>
+                        </figure>`;
+                    }
+                    return imgTag;
                 };
 
-                // 3. Parse Markdown
+                renderer.table = function (token) {
+                    let header = '';
+                    let body = '';
+
+                    if (token.header) {
+                        header += '<tr>';
+                        for (let i = 0; i < token.header.length; i++) {
+                            const cell = token.header[i];
+                            header += `<th align="${token.align[i]}">${marked.parseInline(cell.text)}</th>`;
+                        }
+                        header += '</tr>';
+                    }
+
+                    if (token.rows) {
+                        for (let i = 0; i < token.rows.length; i++) {
+                            const row = token.rows[i];
+                            body += '<tr>';
+                            for (let j = 0; j < row.length; j++) {
+                                const cell = row[j];
+                                body += `<td align="${token.align[j]}">${marked.parseInline(cell.text)}</td>`;
+                            }
+                            body += '</tr>';
+                        }
+                    }
+
+                    return `
+                    <div class="my-10 overflow-x-auto rounded-xl border border-white/10 bg-slate-900/50 shadow-2xl">
+                        <table>
+                            <thead>${header}</thead>
+                            <tbody>${body}</tbody>
+                        </table>
+                    </div>`;
+                };
+
+                // 4. Parse Markdown to HTML
                 marked.setOptions({ renderer: renderer });
                 contentEl.innerHTML = marked.parse(text);
 
-                // Post-Processing: Fix raw HTML <img> tags
-                // This allows syntax like <img src="assets/demo.jpg"> to work
+                // 5. Inject Metadata UI
+                const h1 = contentEl.querySelector('h1');
+                if (h1) {
+                    const metadataRow = document.createElement('div');
+                    metadataRow.className = "flex items-center gap-3 text-xs font-mono text-slate-500 mb-8 pb-4 border-b border-white/5 select-none";
+                    metadataRow.innerHTML = `
+                        <span class="text-cyan-400 font-bold tracking-wide">${author.toUpperCase()}</span>
+                        <span class="text-slate-700">•</span>
+                        <span class="tracking-wide">${date.toUpperCase()}</span>
+                    `;
+                    h1.parentNode.insertBefore(metadataRow, h1.nextSibling);
+                }
+
+                // 6. Post-Processing: Fix raw HTML <img> tags
                 contentEl.querySelectorAll('img').forEach(img => {
                     const src = img.getAttribute('src');
                     if (src && src.startsWith('assets/')) {
-                        const newSrc = `projects/${projectId}/${src}`;
-                        img.setAttribute('src', newSrc);
-                        console.log(`[Viewer] Rewrote HTML Asset: ${src} -> ${newSrc}`);
+                        img.setAttribute('src', `projects/${projectId}/${src}`);
                     }
                 });
 
-                // Post-Processing: Decorate Code Blocks (Terminal Style)
+                // 7. Apply Terminal Wrappers
                 contentEl.querySelectorAll('pre').forEach(pre => {
-                    // 1. Create Wrapper
+                    // Create Wrapper
                     const wrapper = document.createElement('div');
-                    wrapper.className = "my-8 rounded-lg overflow-hidden border border-slate-700/50 bg-[#2d2d2d] shadow-2xl";
+                    wrapper.className = "terminal-wrapper my-8 rounded-lg overflow-hidden border border-slate-700/50 bg-[#2d2d2d] shadow-2xl";
 
-                    // 2. Create Header
+                    // Create Header
                     const header = document.createElement('div');
                     header.className = "flex items-center px-4 py-1.5 bg-[#1e1e1e] border-b border-slate-700/50";
 
-                    // Language Label (Text Only)
+                    // Extract Language from Code Block
                     const code = pre.querySelector('code');
                     let lang = 'TEXT';
                     if (code && code.className) {
@@ -245,32 +342,60 @@
 
                     header.appendChild(langBadge);
 
-                    // 3. Setup Pre
+                    // Style Pre
                     pre.className = "custom-scrollbar overflow-x-auto px-6 py-4 text-sm leading-relaxed";
 
-                    // 4. Assemble
+                    // Assemble
                     pre.parentNode.insertBefore(wrapper, pre);
                     wrapper.appendChild(header);
                     wrapper.appendChild(pre);
                 });
 
-                // 4. Highlight Code (Prism) - Wait for DOM updates
+                // Post-Processing: Justify Abstract Paragraphs
+                contentEl.querySelectorAll('h2').forEach(h2 => {
+                    if (h2.textContent.trim() === 'Abstract') {
+                        let next = h2.nextElementSibling;
+                        while (next) {
+                            // Stop if we hit another header
+                            if (['H1', 'H2', 'H3'].includes(next.tagName)) break;
+
+                            // If it's a paragraph, justify it
+                            if (next.tagName === 'P') {
+                                next.classList.add('text-justify');
+                            }
+                            next = next.nextElementSibling;
+                        }
+                    }
+                });
+
+                // 8. Syntax Highlighting (DELAYED Manual Trigger)
                 setTimeout(() => {
-                    Prism.highlightAllUnder(contentEl);
+                    if (typeof Prism !== 'undefined') {
+                        // Alias MLIR to LLVM if available
+                        if (Prism.languages.llvm) {
+                            Prism.languages.mlir = Prism.languages.llvm;
+                        }
 
-                    // 5. Render Math (KaTeX)
-                    renderMathInElement(contentEl, {
-                        delimiters: [
-                            { left: '$$', right: '$$', display: true },
-                            { left: '$', right: '$', display: false }
-                        ],
-                        throwOnError: false
-                    });
-                }, 0);
+                        // Use manual loop as requested instead of highlightAllUnder
+                        contentEl.querySelectorAll('pre code').forEach(el => {
+                            Prism.highlightElement(el);
+                        });
+                    }
 
-                // 6. Reveal
-                loadingEl.classList.add('hidden');
-                contentEl.classList.remove('opacity-0');
+                    // 9. Render Math and Reveal (After Prism is done)
+                    if (typeof renderMathInElement !== 'undefined') {
+                        renderMathInElement(contentEl, {
+                            delimiters: [
+                                { left: '$$', right: '$$', display: true },
+                                { left: '$', right: '$', display: false }
+                            ],
+                            throwOnError: false
+                        });
+                    }
+
+                    loadingEl.classList.add('hidden');
+                    contentEl.classList.remove('opacity-0');
+                }, 50); // 50ms Delay to ensure DOM is ready
 
             } catch (err) {
                 console.error("[Viewer] Critical Error:", err);

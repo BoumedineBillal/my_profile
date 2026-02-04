@@ -1,0 +1,30 @@
+# Project Blog Content Rules
+
+1. METADATA (MANDATORY START)
+- The file MUST start with exactly these two lines:
+author: Billal Boumedine
+date: [Current Month and Year]
+
+2. HEADER & QUOTE (MANDATORY STRUCTURE)
+- Main Title: Use H1 (# Title) once. 
+- Quote: Immediately after the H1 title, include a blockquote beginning with >.
+
+3. REQUIRED SECTION
+- You MUST include a ## Abstract section immediately after the quote.
+
+4. HEADER SIZES (HIERARCHY)
+- Section Titles: Use H2 (## Name) for main parts.
+- Sub-sections: Use H3 (### Name) for details.
+
+5. MATH EQUATIONS
+- Use LaTeX syntax: $inline$ and $$block$$.
+
+6. IMAGES & FIGURES
+- Use: ![Alt Text](assets/filename.jpg "Figure X: Title of the image")
+- The title in quotes is mandatory for the caption.
+
+7. CODE & TABLES
+- Use standard Markdown code blocks (e.g. ```cpp) and pipe tables (|).
+
+### INSTRUCTION FOR AGENT:
+Only apply these formatting rules when the user specifically requests to write, format, or update a project blog/index.md file. Do not apply this structure to general conversation or unrelated tasks.
