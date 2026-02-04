@@ -5,6 +5,7 @@ date: January 2026
 
 > "Optimization is not just about making things faster; it is about restructuring the problem so that the hardware solves it naturally."
 
+[ `SOURCE_CODE` ](https://github.com/BoumedineBillal/yolo26n_esp)
 
 ![Hardware Setup](assets/Lémir-Abdelkader-Moubayaâ-Hocine-Ziani.jpeg "Figure 1: YOLO26n Inference Demo: 512x512 Object Detection on ESP32-P4.")
 
