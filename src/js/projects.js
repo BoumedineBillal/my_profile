@@ -4,21 +4,24 @@ const projects = [
         title: "World’s First YOLO26n on ESP32-P4",
         desc: "Adapting Training Pipelines for QAT and Graph Optimization to Achieve 36.5% mAP at 512px Resolution with 1.7s Latency",
         img: "projects/yolo26n-esp32p4/assets/yolo26n-esp32p4.jpg",
-        link: "project-viewer.html?id=yolo26n-esp32p4"
+        link: "project-viewer.html?id=yolo26n-esp32p4",
+        repo: "https://github.com/BoumedineBillal/yolo26n_esp"
     },
     {
         id: "coming_soon",
         title: "Coming Soon",
         desc: "Coming Soon",
         img: "public/assets/projects/coming_soon.jpg",
-        link: "#"
+        link: "#",
+        repo: ""
     },
     {
         id: "coming_soon",
         title: "Coming Soon",
         desc: "Coming Soon",
         img: "public/assets/projects/coming_soon.jpg",
-        link: "#"
+        link: "#",
+        repo: ""
     }
 ];
 
