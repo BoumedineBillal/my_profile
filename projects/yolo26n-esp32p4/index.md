@@ -1,505 +1,475 @@
 author: Billal Boumedine 
 date: January 2026
 
-# World’s First YOLO26n on ESP32-P4: Adapting Training Pipelines for QAT and Graph Optimization to Achieve 36.5% mAP at 512px Resolution with 1.7s Latency
+# World's First YOLO26n on ESP32-P4: From Custom QAT Pipeline to Bit-Exact Hardware Validation — Merged into Espressif's esp-dl
 
 > "Optimization is not just about making things faster; it is about restructuring the problem so that the hardware solves it naturally."
 
-[ `SOURCE_CODE` ](https://github.com/BoumedineBillal/yolo26n_esp)
+[ `SOURCE_CODE` ](https://github.com/BoumedineBillal/yolo26n_esp) · [ `ESP_PPQ_LUT` ](https://github.com/BoumedineBillal/esp_ppq_lut) · [ `MERGED PR #286` ](https://github.com/espressif/esp-dl/pull/286)
 
 ![Hardware Setup](assets/Lémir-Abdelkader-Moubayaâ-Hocine-Ziani.jpeg "Figure 1: YOLO26n Inference Demo: 512x512 Object Detection on ESP32-P4.")
 
 ## Abstract
 
-This project documents the first successful deployment of the **[YOLO26n](https://github.com/BoumedineBillal/yolo26n_esp)** architecture on the **ESP32-P4** microcontroller, setting a new benchmark with **1.7s latency** at **512x512 resolution** and **36.5% mAP (coco dataset)**. Standard Post-Training Quantization (PTQ) workflows often destroy the accuracy of modern detection models on low-precision hardware. To solve this, I built a custom **Quantization-Aware Training (QAT) pipeline** that connects the `esp-ppq` backend directly to `ultralytics` loss functions. This allowed me to fine-tune the 8-bit weights against the strict One-to-One matching signal of YOLO26, preserving accuracy even with the simplified regression head.
+This project documents the first successful deployment of **[YOLO26n](https://github.com/BoumedineBillal/yolo26n_esp)** on the **ESP32-P4** microcontroller, achieving **2,062ms inference** at **512x512 resolution** with **36.5% mAP** on the COCO dataset. The implementation was **[merged into Espressif's official esp-dl repository](https://github.com/espressif/esp-dl/pull/286)** as the reference YOLO26n example for ESP32-P4 and ESP32-S3.
 
-I designed the optimization strategy specifically for the ESP32-P4’s **RISC-V PIE (SIMD) instruction set extension**. By performing a **["Split-Head" Graph Surgery](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/pipeline_source/export.py#L17-L25)**, I decoupled the computational graph: the heavy convolution layers run on the hardware-accelerated SIMD extensions, while the complex non-linear decoding which is inefficient for vector processing moves to a custom C++ **[`Yolo26Processor`](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/yolo26n_esp32p4/main/yolo_processor.hpp#L24)**. This processor uses **LUT-based lossless input quantization** and **integer-domain thresholding** to bypass floating-point normalization and skip over 99% of unnecessary Sigmoid activations. The result proves that you can run high-fidelity object detection on edge silicon if you are willing to co-design the software stack around the hardware’s actual limits.
+The path to deployment was far from straightforward. Standard Post-Training Quantization (PTQ) workflows destroyed the accuracy of YOLO26n's sensitive One-to-One detection head on low-precision hardware. I built a custom **Quantization-Aware Training (QAT) pipeline** connecting the `esp-ppq` backend to `ultralytics` loss functions, and designed a **["Split-Head" Graph Surgery](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/pipeline_source/export.py#L17-L25)** to decouple the computational graph: heavy convolutions run on the hardware-accelerated SIMD extensions, while the non-linear decoding moves to a custom C++ **[`Yolo26Processor`](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/yolo26n_esp32p4/main/yolo_processor.hpp#L24)**.
 
-## Performance Benchmark: 1.77s Inference at 36.5% mAP
+But the hardest challenge came after the initial deployment. I discovered that YOLO26n's detection head is so sensitive to quantization noise that INT8 activations completely destroy bounding box regression. The only viable path was INT16 Swish, but ESP-DL's native INT16 Swish falls back to a naive `dequantize → float32 → requantize` path, adding **~660ms per layer** and pushing total inference beyond 5 seconds. To solve this, I built **[esp_ppq_lut](https://github.com/BoumedineBillal/esp_ppq_lut)**, a bit-exact emulation library that creates a "Digital Twin" of ESP-DL's hardware-accelerated LUT interpolation inside Python. This library achieved **0 errors across 451,584 output values** compared to real ESP32-P4 hardware, validated through a rigorous 4-test firmware protocol.
 
-Before detailing the engineering methodology, I present the final deployment results on the ESP32-P4. The goal was not just to run the model, but to outperform the current state-of-the-art (SOTA) baseline specifically the official YOLOv11n implementation in `esp-dl` in terms of efficiency at comparable accuracy.
+During this work, I also discovered and reported a **fencepost bug** in esp-ppq's LUT exporter that caused out-of-bounds memory reads on the MCU for high positive inputs — a fix that was adopted by the esp-ppq maintainers.
+
+The final validated pipeline: **PTQ → TQT → INT16 LUT fusion → export** — delivering **25% faster inference** than the official YOLOv11n baseline while maintaining superior accuracy.
+
+## Performance Benchmark
+
+Before detailing the engineering methodology, I present the final validated deployment results on the ESP32-P4.
 
 ### Comparative Results (ESP32-P4)
 
-| Model Architecture | Configuration | Resolution | mAP (COCO) | Latency | Benchmark | Status |
+| Model Architecture | Configuration | Resolution | mAP (COCO) | Inference | Total Latency | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **YOLO26n (Optimized)** | **Int8 QAT** | **512x512** | **36.5%** | **1.77s** | **[link](https://github.com/BoumedineBillal/yolo26n_esp/tree/main/yolo26n_esp32p4)** | **✅ Target** |
-| YOLO26n (High-Res) | Int8 QAT | 640x640 | 38.5% | 3.00s | [link](#) | |
-| YOLOv11n (Baseline) | Official ESP-DL QAT | 640x640 | 36.0% | 2.75s | [link](https://github.com/espressif/esp-dl/tree/master/models/coco_detect) | |
+| **YOLO26n (Final)** | **PTQ + TQT + LUT** | **512x512** | **36.5%** | **2,062ms** | **~2.1s** | **✅ Merged into [esp-dl](https://github.com/espressif/esp-dl/pull/286)** |
+| YOLO26n (High-Res) | PTQ + TQT + LUT | 640x640 | 38.7% | 3,474ms | ~3.5s | |
+| YOLOv11n (Baseline) | Official ESP-DL | 640x640 | 36.0% | 2,764ms | ~2.8s | |
 
-### Analysis: Why 512px is the Winner
+### Analysis: Why YOLO26n Wins
 
-While YOLOv11n appears faster at 640x640 (2.75s vs 3.00s), a direct resolution comparison is misleading. The true engineering metric is **latency at equivalent accuracy**.
+To achieve a target accuracy of ~36% mAP, the standard YOLOv11n requires a resolution of 640x640, forcing a computation cost of 2,764ms. My optimized YOLO26n pipeline reaches **36.5% mAP** at a reduced resolution of **512x512**, dropping the inference time to **2,062ms**.
 
-To achieve a target accuracy of ~36% mAP, the standard YOLOv11n requires a resolution of 640x640, forcing a computation cost of 2.75s per frame. In contrast, my optimized YOLO26n pipeline achieves a higher accuracy of **36.5% mAP** at a reduced resolution of **512x512**, dropping the inference time to just **1.77s**.
+This resolution shift, enabled by the superior feature extraction of the v26 architecture, results in a **25% faster inference (2,062ms vs 2,764ms)** while maintaining a slight accuracy advantage (+0.5% mAP).
 
-This resolution shift, enabled by the superior feature extraction of the v26 architecture and my QAT pipeline, results in a net performance gain of **35% faster inference (1.77s vs 2.75s)** while maintaining a slight accuracy advantage (+0.5% mAP).
-
-> **Note on Real-Time Performance & Optimization Potential:**
+> **Note on Evolution of These Numbers:**
 >
-> While **1.77s** is not "real-time" (typically <30ms), this benchmark deliberately stresses the hardware to establish a fair comparison.
-> 1.  **Resolution:** Standard YOLO models are trained at high resolutions (512/640px). Matching these dimensions is necessary to validate the architectural efficiency against official baselines, even though many edge applications run successfully at much lower resolutions (e.g., 224px or 320px).
-> 2.  **Class Count:** The COCO dataset forces the model to learn **80 distinct object classes**, consuming significant capacity. In real-world edge scenarios, we typically only need to detect a specific subset (e.g., just "person" or "defect"), meaning that with the same model size we can get more accuracy.
+> The initial benchmarks for this project showed 1,780ms inference with a pure INT8 pipeline. However, during the review process for the esp-dl PR, I discovered that the INT8 detection head was producing incorrect accuracy numbers due to a validator bug and an incomplete quantization configuration. The corrected pipeline requires INT16 activations in the detection head (via hardware-accelerated LUT), which adds ~280ms but produces properly validated accuracy. The numbers above reflect the final, validated pipeline.
+
+> **Note on Real-Time Performance:**
 >
-> Reducing the class count and input resolution can drastically improve both speed and accuracy, though likely still short of 30FPS on this specific hardware without more smart optimizations. There are still many factors to optimize to achieve real-time performance, and balancing "sufficient" accuracy with maximum throughput remains a key objective for future projects.
+> While **~2.1s** is not "real-time," this benchmark deliberately stresses the hardware at 512px with 80 COCO classes. In real-world edge scenarios with fewer classes (e.g., just "person" or "defect") and lower resolutions (224px or 320px), latency drops drastically. Balancing "sufficient" accuracy with maximum throughput remains a key objective for future work.
+
 
 ## The Deployment Challenge: Why ESP32-P4 is Different
 
-To understand the magnitude of this engineering effort, it is helpful to contrast it with the standard "easy mode" of Edge AI. If I were deploying this same model to a Linux-based system with a [Google Coral TPU](https://developers.google.com/coral), the entire process would typically look like this:
+To understand the magnitude of this effort, it helps to contrast it with the standard "easy mode" of Edge AI. If I were deploying this same model to a Linux-based system with a [Google Coral TPU](https://developers.google.com/coral), the entire process would look like this:
 
- ```python
+```python
 from ultralytics import YOLO
 
-# Load the YOLO26 model
 model = YOLO("yolo26n.pt")
-
-# Export the model to TFLite Edge TPU format
-model.export(format="edgetpu")  # creates 'yolo26n_full_integer_quant_edgetpu.tflite'
-
-# Load the exported TFLite Edge TPU model
+model.export(format="edgetpu")
 edgetpu_model = YOLO("yolo26n_full_integer_quant_edgetpu.tflite")
-
-# Run inference
 results = edgetpu_model("https://ultralytics.com/images/bus.jpg")
- ```
+```
 
 With just a single line of code, the model is quantized, compiled, and ready to run. Why does this "magic" not exist for microcontrollers?
 
-The answer lies in the fundamental difference between a specialized AI accelerator and a low-cost microcontroller. The [ESP32-P4](https://www.espressif.com/en/products/socs/esp32-p4) is not a Linux computer with a dedicated NPU; it is a highly efficient MCU designed for cost-sensitive and energy-constrained applications. While it features the powerful [RISC-V "PIE" (Processor Instruction Extensions)](https://developer.espressif.com/blog/2024/12/pie-introduction/), this is a SIMD (Single Instruction, Multiple Data) instruction set extension, not a black-box neural accelerator.
+The [ESP32-P4](https://www.espressif.com/en/products/socs/esp32-p4) is not a Linux computer with a dedicated NPU; it is a highly efficient MCU designed for cost-sensitive and energy-constrained applications. While it features the powerful [RISC-V "PIE" (Processor Instruction Extensions)](https://developer.espressif.com/blog/2024/12/pie-introduction/), this is a SIMD instruction set extension, not a black-box neural accelerator.
 
-To unlock the P4's performance, operations must be executed in **Int8 precision**. However, modern object detection models like YOLO26n are trained in **Float32**. Bridging this gap is not a simple matter of rounding numbers.
+To unlock the P4's performance, operations must be executed in **Int8 precision**. However, modern object detection models like YOLO26n are trained in **Float32**. Bridging this gap is not simple:
 
-1.  **Quantization Sensitivity:** Naive conversion of weights from Float32 to Int8 introduces "quantization noise." For sensitive architectures like YOLO26n which uses a simplified regression head (`RegMax=1`) this noise often destroys the model's ability to localize objects, causing accuracy to collapse.
+1.  **Quantization Sensitivity:** Naive conversion of weights from Float32 to Int8 introduces "quantization noise." For YOLO26n which uses a simplified regression head (`RegMax=1`) this noise often destroys the model's ability to localize objects.
 2.  **No "Magic Line":** Unlike the mature TFLite ecosystem, there is no single function in the MCU toolchain that can automatically analyze, calibrate, and fine-tune a custom architecture like YOLO26n without degradation.
-3.  **Hardware-Specific Constraints:** On a TPU, one rarely worries about efficient memory alignment or specific operator support. On the ESP32-P4, every layer must be scrutinized to ensure it maps to a hardware-accelerated PIE instruction. If a single layer falls back to standard CPU execution, the latency penalty is severe.
+3.  **Hardware-Specific Constraints:** Every layer must be scrutinized to ensure it maps to a hardware-accelerated PIE instruction. If a single layer falls back to standard CPU execution, the latency penalty is severe.
 
-Therefore, deploying to the ESP32-P4 requires abandoning the "one-click" export mentality and building a custom pipeline that handles these constraints explicitly.
+Deploying to the ESP32-P4 requires abandoning the "one-click" export mentality and building a custom pipeline that handles these constraints explicitly.
 
-## The Solution: A Custom QAT Pipeline
 
-To bridge the gap between the raw PyTorch model and the ESP32-P4's silicon, I established a rigorous deployment pipeline. This section outlines the high-level workflow, with deep dives into each specific engineering challenge to follow in subsequent parts.
+## The Solution: A Custom Deployment Pipeline
 
-### 1. The Starting Point: YOLO26n
-I began with the official pre-trained YOLO26n model, optimized for the COCO dataset. This architecture was chosen for its excellent balance of parameter efficiency and detection performance.
+To bridge the gap between the raw PyTorch model and the ESP32-P4's silicon, I built a multi-stage pipeline that evolved significantly during the review process for the [esp-dl PR](https://github.com/espressif/esp-dl/pull/286).
 
-**Official Performance Metrics (Float32)**:
+### The Starting Point: YOLO26n
 
 | Model | Size (px) | mAP val (50-95) | Speed CPU ONNX (ms) | Params (M) | FLOPs (B) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **YOLO26n** | 640 | 40.9% | 38.9 | 2.4 | 5.4 |
 
-### 2. The Bridge: `esp-ppq`
-The core of this project relies on [esp-ppq](https://github.com/espressif/esp-ppq), Espressif’s specialized fork of the [OpenPPL PPQ](https://github.com/OpenPPL/ppq) library. I chose this tool specifically because it allows for granular control over the quantization process, enabling operation-level optimization that generic tools (like TFLite converters) cannot provide.
+### The Bridge: `esp-ppq`
+The core of this project relies on [esp-ppq](https://github.com/espressif/esp-ppq), Espressif's specialized fork of the [OpenPPL PPQ](https://github.com/OpenPPL/ppq) library. I chose this tool for its granular control over the quantization process, enabling operation-level optimization that generic tools cannot provide.
 
-### 3. The Workflow
-The transformation from a PyTorch checkpoint to a hardware-ready binary involves three critical stages:
+### The Workflow (Final Validated Pipeline)
+The transformation from a PyTorch checkpoint to a hardware-ready binary involves these stages:
 
-1.  **Graph Capture & Quantization:**
-    The first step involves wrapping the standard model operations into a PPQ graph. This graph simulates the ESP32-P4's hardware constraints, converting the Float32 weights to Int8. Typically, this initial "Post-Training Quantization" (PTQ) results in a significant drop in accuracy for compact models like YOLO26n.
-
-2.  **Quantization-Aware Training (QAT):**
-    To recover the lost accuracy, I leveraged a unique feature of the PPQ graph: **gradient flow support**. By injecting "fake quantization" nodes which simulate the rounding errors of Int8 math I can run a training loop on the quantized graph itself. This allows the model to adjust its weights specifically to minimize the error caused by quantization, rather than just minimizing the detection loss.
-
-3.  **Hardware Export (.espdl):**
-    Once the Int8 model recovers its accuracy, the final step is compiling the graph into the `.espdl` format. This proprietary binary format is optimized for the ESP-DL library, ensuring that every layer maps correctly to the P4's SIMD instructions.
+1.  **Graph Capture & ONNX Export:** Custom export with detection head surgery and attention module patches.
+2.  **Selective Quantization:** Hybrid INT8/INT16 precision — 48 layers promoted to INT16 based on layerwise SNR analysis.
+3.  **PTQ Calibration:** Statistical analysis using real data to establish initial quantization parameters.
+4.  **TQT (Trained Quantization Thresholds):** Block-by-block scale optimization — fast single-pass alternative to full QAT.
+5.  **INT16 LUT Fusion:** Replace INT16 Swish activations with compact 4KB hardware-accelerated Look-Up Tables.
+6.  **Graph Surgery:** Split concatenated outputs into separate Box/Class tensors for zero-copy decoding.
+7.  **Hardware Export (.espdl):** Compile to the binary format optimized for ESP-DL's SIMD instructions.
 
 
 ## Step 1: Intelligent ONNX Export & Graph Cleaning
 
-The `esp-ppq` quantization toolchain requires an ONNX model as its input. This is because effective quantization relies on collecting statistics from the model's weights and feature maps to determine optimal scale factors. Unlike PyTorch, which utilizes a dynamic computational graph, ONNX provides a static graph representation that allows `esp-ppq` to parse the structure, track operations, and inject the necessary quantization nodes reliably.
-
-To achieve this, the first step is converting the dynamic PyTorch model into this static format. In a standard "easy mode" workflow, a developer would typically attempt the export with a single, convenient block of code:
+The `esp-ppq` quantization toolchain requires an ONNX model as input. In a standard workflow, a developer would attempt:
 
 ```python
 from ultralytics import YOLO
-
-# Load your model (pretrained or custom)
-model = YOLO("yolo26n.pt") 
-
-# Export to ONNX (The "Naive" Approach)
+model = YOLO("yolo26n.pt")
 success = model.export(format="onnx")
 ```
 
-While this naive approach produces a valid ONNX file for PC-based inference, it is insufficient and often detrimental for hardware-aware quantization on the ESP32-P4. Exporting the model "as-is" introduces two critical problems that I had to solve via custom graph surgery.
+While this produces a valid ONNX file for PC inference, it is insufficient for hardware-aware quantization on the ESP32-P4. Exporting the model "as-is" introduces two critical problems that I solved via custom graph surgery.
 
 ### Challenge 1: The "Decoded" Detection Head
-In a standard YOLO export, the `Detect` head includes post-processing logic: it decodes bounding box coordinates (multiplying by strides, applying anchor points) and concatenates them with class scores. While convenient for high-level APIs, this logic is toxic for MCU quantization:
+In a standard YOLO export, the `Detect` head includes post-processing logic: it decodes bounding box coordinates and concatenates them with class scores. This is toxic for MCU quantization:
 
-1.  **QAT Compatibility (Crucial):** For Quantization-Aware Training to work, we need to calculate the loss during the fine-tuning loop. The standard Ultralytics loss functions are designed to accept **raw grid predictions** to compute gradients and update weights. If the model outputs fully decoded boxes, we break the gradient flow, making it impossible to fine-tune the model against the quantization error.
+1.  **QAT Compatibility:** The Ultralytics loss functions expect **raw grid predictions** to compute gradients. Decoded boxes break gradient flow, making fine-tuning impossible.
 2.  **Quantization Complexity:** Operations like `Slice`, `Concat`, and `Mul` in the decoding block are highly sensitive to quantization noise.
-3.  **Inefficiency:** It is far more efficient to handle this decoding in C++ on the CPU using standard integer math than to force it through the quantized neural network graph.
+3.  **Inefficiency:** Decoding is far more efficient in C++ using standard integer math than forced through the quantized graph.
 
-**The Solution: Exporting Raw Feature Maps**
-Instead of the full post-processed output, I modified the export logic to abort the `Detect.forward` method early. I configured the model to output the raw tensors from the **One-to-One (one2one)** branch the specific branch trained with Hungarian Matching for NMS-free inference.
+**The Solution:** I modified the export logic to abort the `Detect.forward` method early, outputting the raw tensors from the **One-to-One** branch — the branch trained with Hungarian Matching for NMS-free inference.
 
-This results in exactly **6 output tensors** (3 Scales × 2 Data Types) that represent the raw grid predictions. These are the "clean" signals the quantization tool needs to analyze.
-
-| Output Name | Stride | Grid Size (512px Input) | Channels | Description |
+| Output Name | Stride | Grid Size (512px) | Channels | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | `one2one_p3` | 8 | 64x64 | 84 | Small Objects (4 Box + 80 Class) |
-| `one2one_p4` | 16 | 32x32 | 84 | Medium Objects (4 Box + 80 Class) |
-| `one2one_p5` | 32 | 16x16 | 84 | Large Objects (4 Box + 80 Class) |
+| `one2one_p4` | 16 | 32x32 | 84 | Medium Objects |
+| `one2one_p5` | 32 | 16x16 | 84 | Large Objects |
 
-*Note: The 84 channels consist of 4 Box Regression values (dx, dy, dw, dh) and 80 COCO Class Scores.*
-
-![Removing the Detection Head](assets/dec_head.jpg "Figure 2: Removing the Detection Head. (Left) The standard ONNX export includes a massive Decoding Block filled with operations that break QAT gradient flow and degrade quantization accuracy. (Right) The result of my graph surgery: the model now terminates cleanly at the raw One-to-One regression and classification heads, preserving the exact signals needed for both efficient training and hardware acceleration.")
+![Removing the Detection Head](assets/dec_head.jpg "Figure 2: Removing the Detection Head. (Left) The standard ONNX export includes a massive Decoding Block that breaks QAT gradient flow. (Right) The model terminates cleanly at the raw One-to-One regression and classification heads.")
 
 ### Challenge 2: Dynamic Shape Arithmetic in Attention Layers
-The second issue lies in the YOLOv26 Attention modules (e.g., C2PSA). The standard implementation calculates tensor dimensions at runtime using operations like `x.shape[2] * x.shape[3]`.
-* **The Problem:** When exported, this generates a complex subgraph of `Shape -> Gather -> Mul` nodes just to calculate dimensions that are technically constant for a fixed input size. This "dynamic noise" confuses the esp-ppq compiler and complicates the graph optimization for the PIE instruction set.
-* **The Fix (**[`ESP_Attention`](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/pipeline_source/export.py#L86)**):** I implemented a "monkey patch" that replaces the dynamic shape calculation with a static `x.view(Batch, Heads, Dim, -1)` operation.
+The YOLOv26 Attention modules calculate tensor dimensions at runtime using `x.shape[2] * x.shape[3]`. When exported, this generates a subgraph of `Shape -> Gather -> Mul` nodes that confuses the esp-ppq compiler.
 
-By forcing the exporter to use `dynamic=False` combined with this patch, the ONNX exporter "bakes in" the exact constant dimensions (e.g., `Reshape to 64x64`). This produces a streamlined, static graph that the ESP32-P4 compiler can ingest without errors, ensuring that every cycle is spent on convolution, not shape arithmetic.
+**The Fix ([`ESP_Attention`](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/pipeline_source/export.py#L86)):** A "monkey patch" that replaces the dynamic shape calculation with a static `x.view(Batch, Heads, Dim, -1)` operation. Combined with `dynamic=False`, the ONNX exporter "bakes in" the exact constant dimensions.
 
-![Streamlining the Attention Module via Graph Surgery](assets/reshape_op.jpg "Figure 3: Streamlining the Attention Module via Graph Surgery. (Left) The standard export generates a complex subgraph of dynamic shape arithmetic (Shape -> Gather -> Mul) that confuses the MCU compiler. (Right) The patched ESP_Attention module forces a single, static Reshape node, critical for efficient execution on the ESP32-P4.")
+![Streamlining the Attention Module](assets/reshape_op.jpg "Figure 3: Streamlining the Attention Module. (Left) Dynamic shape arithmetic confuses the MCU compiler. (Right) The patched module forces a single, static Reshape node.")
+
 
 ## Step 2: Selective Quantization & The "Teacher-Student" Graph
 
-With the clean ONNX graph from Step 1 now explicitly exposing both the **Main (One-to-One)** and **Auxiliary (One-to-Many)** branches, we move to the quantization strategy.
+With the clean ONNX graph exposing both the **Main (One-to-One)** and **Auxiliary (One-to-Many)** branches, I implemented a **[topology-aware quantization routine](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/YOLOv26_QAT_Workflow.ipynb)** enforcing a strict hybrid policy:
 
-A standard quantization tool would blindly convert every operation in this graph to Int8. However, because we deliberately preserved the Auxiliary branch for training purposes, blindly quantizing it would be a mistake. The Auxiliary branch serves as a "teacher" during the fine-tuning process; if we quantize it, we introduce noise into the very signal supposed to guide the model.
+1.  **Main Branch (One-to-One):** Marked for **Quantization** — this path runs on the ESP32-P4.
+2.  **Auxiliary Branch (One-to-Many):** Forced to **Float32** — the "teacher" provides high-fidelity gradients during training.
+3.  **Shared Backbone:** **Quantized** since it feeds the Main branch.
 
-### The "Hybrid Precision" Strategy
+Additionally, through **layerwise SNR analysis** using `esp-ppq`'s `layerwise_error_analyse`, I identified the most quantization-sensitive layers. The neck exit layers (`model.16/19/22` Conv+Swish) and all final 1x1 projection Conv layers in the detection head were the worst offenders under INT8. Promoting these to **INT16** — a total of **48 layers** (27 Conv + 21 Swish) — raised the PTQ baseline significantly.
 
-To solve this, I implemented a **[topology-aware quantization routine](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/YOLOv26_QAT_Workflow.ipynb)** within the `esp-ppq` workflow. Instead of a global Int8 setting, I enforced a strict hybrid policy based on the graph's structure:
-
-1.  **Main Branch (One-to-One):**
-    These layers are marked for **Int8 Quantization**. This is the path that will actually run on the ESP32-P4, so the model must learn to adapt to the lower precision here.
-
-2.  **Auxiliary Branch (One-to-Many):**
-    I traced the graph backwards from the auxiliary outputs to identify operators exclusive to this branch. These are forced to remain in **Float32**. This ensures the "teacher" provides a high-fidelity gradient signal during training.
-
-3.  **Shared Backbone:**
-    Since the backbone feeds the Main branch, it must be **Quantized**.
-
-This setup creates a perfect QAT environment: the shared weights are fine-tuned to survive Int8 quantization, guided by a high-precision auxiliary loss that remains unaffected by the hardware constraints.
-
-> **Note: The Engineering Logic Behind the "Auxiliary" Branch**
+> **The Engineering Logic Behind the Dual-Head Architecture:**
 >
-> To understand why we treat the two heads differently, we must look at the "Dual-Head" architecture introduced in YOLOv10 and refined in YOLO26.
+> * **One-to-One Head (The "Student"):** Our deployment target. Uses Hungarian Matching to predict exactly *one* box per object, eliminating NMS. However, this creates a "sparse" gradient signal.
+> * **One-to-Many Head (The "Teacher"):** Matches a single object to *multiple* positive predictions, generating a "dense" gradient signal.
 >
-> * **One-to-One Head (The "Student"):** This is our deployment target. It uses Hungarian Matching to predict exactly *one* box per object, eliminating the need for NMS inference. However, this creates a "sparse" gradient signal that is difficult to learn from scratch.
-> * **One-to-Many Head (The "Teacher"):** This branch matches a single object to *multiple* positive predictions, generating a "dense" and rich gradient signal for feature learning.
->
-> **The Strategy:** In our QAT pipeline, the Auxiliary branch acts as a **high-precision teacher**. By forcing it to remain in **Float32**, we ensure the optimization gradients remain pure. Meanwhile, the Main branch is quantized to **Int8**, forcing it to learn how to produce accurate, single-box predictions *despite* the hardware-induced precision loss. This "Teacher-Student" dynamic is the secret to recovering accuracy in low-bit deployments.
+> By keeping the teacher in **Float32**, the optimization gradients remain pure while the student learns to produce accurate predictions *despite* hardware-induced precision loss.
 
-![The Hybrid Quantization Strategy](assets/branches.jpg "Figure 4: The Hybrid Quantization Strategy. (Left) The One-to-Many auxiliary head is kept in Float32 to provide high-fidelity gradients (the Teacher). (Right) The One-to-One deployment head is quantized to Int8 (the Student), forcing it to learn robust predictions under hardware constraints.")
+![The Hybrid Quantization Strategy](assets/branches.jpg "Figure 4: The Hybrid Quantization Strategy. (Left) The One-to-Many auxiliary head is kept in Float32 (the Teacher). (Right) The One-to-One deployment head is quantized (the Student).")
 
 
 ## Step 3: Post-Training Quantization (PTQ) & Statistical Calibration
 
-With the "Hybrid" graph defined keeping the teacher in Float32 and the student in Int8 we arrive at the critical baseline phase: **Calibration** (or PTQ).
+With the hybrid graph defined, we arrive at the baseline phase: **Calibration**.
 
-You cannot simply "switch" a neural network to 8-bit integers and expect it to work. The model needs to establish a statistical baseline. It must determine: *"If my floating point activation is 5.67, what integer does that correspond to?"* To answer this, we must run a rigorous statistical analysis using real data.
-
-### The "Sound Check" Approach
-I treat calibration like a sound check before a concert. We do not need the full training dataset; we simply need a representative subset (the `cali_loader`) to set the levels scales and offsets correctly so the signal doesn't clip or vanish.
-
-However, blind statistics are not enough. We must ensure we are measuring the data as the *hardware* will see it, not how PyTorch sees it. To do this, I implemented a rigid optimization pipeline that structures the graph before a single value is measured.
+I treat calibration like a sound check before a concert. We run a representative subset through the network to set the levels — scales and offsets — correctly so the signal doesn't clip or vanish. Critically, we must measure the data as the *hardware* will see it, not how PyTorch sees it.
 
 ```python
-# Calibration Pipeline: Simulate Hardware Reality
-# [View Source](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/YOLOv26_QAT_Workflow.ipynb)
-# This sequence forces the software graph to mimic ESP32-P4 behavior
-print("Running Calibration Pipeline...")
-
 pipeline = PFL.Pipeline([
     QuantizeSimplifyPass(),
-    
-    # 1. Fuse layers (Conv+Bn+Relu) to match hardware execution
-    # This prevents calibrating intermediate values that won't exist on the chip
     QuantizeFusionPass(activation_type=quantizer.activation_fusion_types),
-    
-    # 2. Fix the quantization range for specific layers
     ParameterQuantizePass(),
-    
-    # 3. The "Sound Check": Collect statistics (Min/Max/Entropy) from real data
     RuntimeCalibrationPass(method=QATConfig.QUANT_CALIB_METHOD),
-    
-    # 4. Handle passive parameters
     PassiveParameterQuantizePass(clip_visiblity=QuantizationVisibility.EXPORT_WHEN_ACTIVE),
-    
-    # 5. Enforce topological constraints (Critical for ESP32-P4)
     QuantAlignmentPass(elementwise_alignment=QATConfig.QUANT_ALIGNMENT),
 ])
 
-# Execute the optimization
 pipeline.optimize(
     calib_steps=QATConfig.CALIB_STEPS,
     collate_fn=(lambda x: x.type(torch.float).to(QATConfig.DEVICE)),
     graph=graph,
-    dataloader=cali_loader, # A subset of real images
+    dataloader=cali_loader,
     executor=executor,
 )
 ```
 
-### 1. Simulating Hardware Reality: Fusion
-The ESP32-P4 does not execute a Convolution, then a Batch Normalization, and then a ReLU as three separate steps. To maximize throughput, the hardware compiler "fuses" these into a single atomic operation.
+**Key passes:**
+- **`QuantizeFusionPass`**: The ESP32-P4 fuses Conv+BN+Relu into a single atomic operation. Calibrating these layers individually would produce wrong statistics.
+- **`RuntimeCalibrationPass`**: Feeds real images through the network, placing "observers" at every junction to record the dynamic range. I used **percentile** calibration, which produced tighter scale ranges and better downstream convergence than KL divergence.
+- **`QuantAlignmentPass`**: The ESP32-P4 enforces strict topological rules — operations like Concatenation and Elementwise Add require matching quantization parameters. This pass "locks" related tensors together, ensuring zero-overhead execution.
 
-If we calibrated these layers individually, our statistics would be wrong. The `QuantizeFusionPass` merges these operations within the software graph first. This ensures we are calibrating the **exact signal** that will be processed by the MCU, preventing mismatch errors later.
 
-### 2. The Statistical Observer
-Once fused, the `RuntimeCalibrationPass` executes the analysis. It feeds batches of real images from the `cali_loader` through the network, placing "observers" at every junction to record the dynamic range of the activations. We aren't training weights here; we are purely listening to the data to calculate the initial `scale` and `zero_point`.
+## Step 4: Recovering Accuracy with TQT
 
-> **Crucial Note on Alignment:**
->
-> The final step, `QuantAlignmentPass`, is critical for performance. The ESP32-P4, like many hardware accelerators, enforces **strict topological rules**. Operations like **Concatenation**, **Elementwise Add**, and **Pooling** often require their input and output tensors to share the exact same quantization parameters (Scale and Zero-Point).
->
-> If these parameters mismatch, the CPU must perform costly, on-the-fly requantization during inference, destroying latency. This pass scans the graph and "locks" related tensors together (e.g., forcing all inputs of a Concat to match its output scale), ensuring the model is topologically valid for zero-overhead execution.
+Calibration provides a baseline, but for a compact model like YOLO26n (2.4M parameters), the precision loss from INT8/INT16 conversion often degrades detection performance below acceptable limits.
 
-## Step 4: Recovering Accuracy with Quantization-Aware Training (QAT)
+I used **TQT (Trained Quantization Thresholds)** — a recently added feature in esp-ppq suggested by [Ginosko-mia](https://github.com/Ginosko-mia). TQT performs block-by-block scale optimization using reconstruction loss, requiring no real backpropagation through the full model. It is significantly faster than full QAT while achieving comparable results:
 
-Calibration (PTQ) provides a solid baseline, but for a compact model like YOLO26n (only 2.4M parameters), the precision loss from Int8 conversion often degrades detection performance below acceptable limits. To fix this, we need the model to "learn" how to operate within these constraints.
+| Calibration | Method | mAP50-95 (512×512) |
+| :--- | :--- | :--- |
+| percentile | PTQ only | 0.349 |
+| percentile | PTQ → TQT | **0.365** |
+| percentile | PTQ → QAT (8 epochs) | 0.366 |
+| minmax | PTQ → TQT | 0.336 |
 
-This brings us to **Quantization-Aware Training (QAT)**. In this step, we fine-tune the model *through* the quantization simulation. The gradients calculated during backpropagation adjust the weights specifically to minimize the error caused by the Int8 rounding we introduced in the previous steps.
+TQT recovers nearly all the accuracy of full QAT in a fraction of the time, making it the preferred approach for the final pipeline.
 
-### The Training Loop
-
-The training loop looks deceptively similar to a standard PyTorch loop, but the components doing the heavy lifting are specialized for the `esp-ppq` graph.
-
-```python
-print("Starting QAT Training...") # [View Source](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/YOLOv26_QAT_Workflow.ipynb)
-
-# Initialize the QAT Trainer
-# This wrapper handles the forward pass through the FakeQuant nodes
-# and ensures gradients flow correctly to the underlying weights.
-trainer = QATTrainer(graph=graph, model_meta=model_meta, device=QATConfig.DEVICE)
-
-if not os.path.exists(QATConfig.ESPDL_OUTPUT_DIR):
-    os.makedirs(QATConfig.ESPDL_OUTPUT_DIR)
-
-best_mAP = 0
-for epoch in range(QATConfig.EPOCHS):
-    print(f"\n--- Epoch {epoch+1}/{QATConfig.EPOCHS} ---")
-    
-    # Train Epoch: Fine-tune weights against quantization noise
-    trainer.epoch(train_loader)
-    
-    # Validate: Calculate real mAP on the quantized graph
-    current_mAP = trainer.eval()
-    print(f"Epoch: {epoch+1}, mAP50-95: {current_mAP:.3f}")
-    
-    # Save the Best Model
-    if current_mAP > best_mAP:
-        best_mAP = current_mAP
-        print(f"New best mAP! Saving to {QATConfig.ESPDL_OUTPUT_DIR}...")
-        
-        # Export the native graph (.espdl/.json) for the ESP32-P4
-        trainer.save_graph(os.path.join(QATConfig.ESPDL_OUTPUT_DIR, "Best_yolo26n.native"))
-```
-
-### The Challenge: Validating Raw Signals
-Because we stripped the `Detect` head in Step 1, standard YOLO validators which expect decoded boxes will fail.
-
-To solve this, the `QuantizedModelValidator` acts as a hardware simulator. It runs the neural network layers using simulated **Int8 PIE instructions**, while offloading the final decoding logic (strides and anchors) to standard CPU arithmetic. This validates our "Hybrid" architecture, proving the model maintains accuracy even when execution is split between the ESP32-P4's AI extensions and its general-purpose core.
-
-![Closing the Accuracy Gap](assets/ptqVSqat.jpg "Figure 5: Closing the Accuracy Gap. While standard Post-Training Quantization (PTQ) leaves the model with degraded performance (0.319 mAP), the Quantization-Aware Training (QAT) pipeline effectively recovers precision. By fine-tuning the model against simulated quantization noise, we achieved a 14.4% accuracy boost, restoring detection capabilities to near-floating-point levels (0.365 mAP) for the ESP32-P4.")
+![Closing the Accuracy Gap](assets/ptqVSqat.jpg "Figure 5: Closing the Accuracy Gap. Post-Training Quantization (PTQ) alone leaves the model at 0.349 mAP. TQT recovers precision to 0.365 mAP — matching full QAT with a fraction of the training cost.")
 
 
 ## Step 5: Final Graph Surgery (Optimization)
 
-We now have a calibrated, fine-tuned Int8 model (`Best_yolo26n.native`) that recovers the accuracy lost during quantization. However, simply exporting this graph "as-is" would leave performance on the table.
-
-The final challenge is **Memory Layout Optimization**. The model currently outputs a concatenated tensor of **84 channels** (4 Box + 80 Class) per grid cell. While this is tidy for Python, it is inefficient for the ESP32-P4's C++ post-processing.
+We now have a calibrated, fine-tuned model. However, deploying the graph "as-is" would leave performance on the table.
 
 ### The "Zero-Copy" Optimization
-If we deploy the concatenated output, the CPU must burn cycles slicing the memory buffer back apart to separate the bounding box coordinates from the class probabilities.
+The model currently outputs a concatenated tensor of **84 channels** (4 Box + 80 Class) per grid cell. If deployed as-is, the CPU must burn cycles slicing the memory buffer to separate coordinates from class probabilities.
 
-To solve this, I wrote a custom **Graph Surgery Script** that modifies the network topology one last time.
-1.  **Amputate the Concat:** We locate the final `Concat` operation that joins the Box and Class heads.
-2.  **Expose Raw Pointers:** We delete the `Concat` node and promote its *inputs* (the raw Box and Class tensors) to be the new graph outputs.
-3.  **Result:** The cpu writes the Box and Class data into separate, contiguous memory buffers. The C++ decoder can then read them directly ("Zero-Copy") without any intermediate processing.
-
-### The Graph Surgery Logic
-This script loads the QAT result, removes the training-only auxiliary heads, and executes the split.
+I wrote a custom **Graph Surgery Script** that:
+1.  Locates the final `Concat` operation joining the Box and Class heads.
+2.  Deletes the `Concat` node and promotes its inputs to be the new graph outputs.
+3.  Result: The hardware writes Box and Class data into separate, contiguous memory buffers.
 
 ```python
-# Load the Best QAT Model
-graph = load_native_graph(import_file="Best_yolo26n.native")
-
-# 1. Strategy: Find and Destroy Concat Nodes
-# [View Source](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/YOLOv26_QAT_Workflow.ipynb)
 targets = ["one2one_p3", "one2one_p4", "one2one_p5"]
 
 for target_name in targets:
-    # Identify the 'Concat' op feeding the output
-    producer = graph.variables[target_name].source_op 
-    
+    producer = graph.variables[target_name].source_op
+
     if producer.type == "Concat":
-        print(f"Splitting {target_name} at Source Concat...")
-        
-        # Identify inputs (Box=4 channels, Class=80 channels)
         box_var = next(v for v in producer.inputs if 4 in v.shape)
         cls_var = next(v for v in producer.inputs if 80 in v.shape)
-        
-        # Rename them for clarity
+
         box_var._name = f"{target_name}_box"
         cls_var._name = f"{target_name}_cls"
-        
-        # Register them as NEW Graph Outputs
-        graph.outputs.pop(target_name)  # Remove old combined output
+
+        graph.outputs.pop(target_name)
         graph.outputs[box_var.name] = box_var
         graph.outputs[cls_var.name] = cls_var
-        
-        # Delete the Concat Op to break the link
+
         graph.remove_operation(producer)
 ```
 
-### Why "Safe Pruning" is Critical
-After deleting the `Concat` node, the graph is left with "dangling" references. A standard export might fail or include dead code. The script includes a **Robust Pruning Routine** (omitted for brevity) that recursively traces the graph, identifying and removing any operations that no longer connect to the new outputs. This ensures the final structure is as compact as possible, saving precious kilobytes in the ESP32-P4's memory.
+The result: **6 separate output tensors** (`p3_box`, `p3_cls`, `p4_box`, `p4_cls`, `p5_box`, `p5_cls`) that the C++ decoder reads directly via pointer cast — no `memcpy`, no intermediate buffers.
 
-![The Zero-Copy Graph Surgery](assets/cls_box.jpg "Figure 6: The Zero-Copy Graph Surgery. (Left) The default export produces a single concatenated tensor (84 channels), forcing the CPU to waste cycles slicing memory to separate coordinates from classes. (Right) The modified graph deletes the Concat node, exposing the raw Box and Class tensors as separate outputs. This allows the C++ application to read directly from contiguous memory buffers without any copy or split operations.")
+![The Zero-Copy Graph Surgery](assets/cls_box.jpg "Figure 6: The Zero-Copy Graph Surgery. (Left) A single concatenated 84-channel tensor forces CPU slicing. (Right) Separate Box and Class tensors enable zero-copy decoding.")
 
-## Step 6: Exporting the Artifact
 
-With the surgery complete and the "Concat" nodes successfully amputated, our graph is topologically perfect for the ESP32-P4. The final step is to serialize this structure into the native format required by the **ESP-DL** library.
+## Step 6: Exporting the .espdl Artifact
 
-### The `.espdl` Format
-Unlike ONNX, which is a generic exchange format, the `.espdl` file is a highly optimized binary structure tailored for Espressif's hardware constraints. It explicitly contains:
-1.  **Hardware-Specific Layer Definitions:** A graph structure optimized for the ESP32-P4's execution engine, replacing generic operations with hardware-compliant equivalents.
-2.  **The Weights:** Compressed and aligned Int8 parameters ready for direct loading.
-3.  **Quantization Exponents:** The scale factors (shifts) that allow the CPU to interpret the Int8 values back into real-world numbers.
-4.  **Activation LUTs:** Look-Up Tables for non-linear functions (like Sigmoid or Silu), pre-calculated to save runtime cycles.
+With the surgery complete, the final step is serializing the graph into the `.espdl` format — a highly optimized binary structure containing hardware-specific layer definitions, compressed Int8/Int16 parameters, quantization exponents, and activation LUTs.
 
 ```python
-# Final Export
-# This generates the binary that will be flashed to the device
-print(f"Exporting Final Model to {inference_export_path}...")
-
 exporter = PFL.Exporter(platform=QATConfig.TARGET_PLATFORM)
-exporter.export(inference_export_path, graph=graph)
-
-print("Success: 'yolo26n_inference.espdl' generated.")
+exporter.export(inference_export_path, graph=graph, int16_lut_step=32)
 ```
 
-### The Handover
-This command produces the final **`yolo26n_inference.espdl`**. This is the artifact we will flash to the ESP32-P4's storage partition.
-
-Because we manually enforced the output order in the previous step (Box first, then Class), our C++ application can safely map these pointers blindly, knowing that `Output[0]` will always be the Small Object Bounding Boxes and `Output[1]` will be the Small Object Class Scores. We have effectively "hard-coded" the interface between the neural network and the application logic.
-
-> **Pro Tip: Visualizing the Native Graph**
->
-> A huge thank you to [Sun Xiang yu](https://github.com/sun-xiangyu) for adding `.espdl` support to **Netron**, the standard viewer for deep learning models. This allows us to inspect the final binary just like an ONNX file, verifying that our quantization parameters and layer fusions are correct before deployment.
->
-> While the [PR to the official Netron repo](https://github.com/lutzroeder/netron/pull/1338) is pending, you can install the custom version to view your exported models:
->
+> **Pro Tip:** Thanks to [Sun Xiang yu](https://github.com/sun-xiangyu) for adding `.espdl` support to **Netron**. You can inspect the final binary to verify quantization parameters and layer fusions:
 > ```bash
-> # Install Netron with .espdl support
-> pip install  git+https://github.com/sun-xiangyu/netron
-> ```
->
-> Then, launch the viewer using Python:
-> ```python
-> import netron
-> netron.start("yolo26n_inference.espdl")
+> pip install git+https://github.com/sun-xiangyu/netron
 > ```
 
-
-![the .espdl Artifact](assets/espdl.jpg "Figure 7: Inside the .espdl Artifact.(Left & Right) Visualizing the exported binary using the custom Netron viewer. The generic ONNX operations have been replaced by hardware-specific primitives for the ESP32-P4. Note the Swish Activation (originally $x \cdot \sigma(x)$) has been fused into a high-performance Look-Up Table (LUT), and explicit RequantizeLinear nodes have been inserted to handle scale correction between integer operations, ensuring bit-exact execution on the hardware.")
+![The .espdl Artifact](assets/espdl.jpg "Figure 7: Inside the .espdl Artifact. Hardware-specific primitives replace generic ONNX operations. Note the Swish activation fused into a Look-Up Table (LUT), and explicit RequantizeLinear nodes for scale correction between integer operations.")
 
 
 ## Step 7: The C++ Inference Engine
 
-We have successfully exported the `.espdl` artifact. Now, we face the final hurdle: the **Inference Engine**.
+Many developers think the job is done once the model is quantized. On an embedded platform like the ESP32-P4, **CPU cycles are as precious as accelerator cycles**. A slow pre/post-processing pipeline can easily bottleneck a model.
 
-Many developers make the mistake of thinking the job is done once the model is quantized. They write a quick C++ script that loads the model, runs it, and then spends 500ms clumsily processing the data on the CPU. On an embedded platform like the ESP32-P4, **CPU cycles are as precious as accelerator cycles**. A slow pre-processing or post-processing pipeline can easily bottle-neck a 50FPS model down to 15FPS.
+I designed the C++ runtime as a universal **`YOLO26`** component that auto-detects input shape, output dtype (INT8/INT16), and number of classes from the `.espdl` header at runtime — no recompilation for custom models.
 
-To guarantee real-time performance, I designed the C++ runtime with a "Performance-First" architecture. We do not just "run" the model; we wrap it in a highly optimized **[`Yolo26Processor`](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/yolo26n_esp32p4/main/yolo_processor.hpp#L24)**. Here is the engineering logic behind it.
+### 1. Input Optimization: The LUT Trick
+The most expensive part of pre-processing is quantization — normalizing pixels to [0,1] then scaling to Int8.
 
-### 1. The "Processor" Pattern
-In standard examples, you often see image resizing, normalization, and decoding logic scattered inside `app_main`. This is unscalable.
+Since input pixels are always 8-bit integers (0 to 255), there are only **256 possible outcomes**. The processor pre-calculates all results during initialization into a 256-byte **quantization LUT**. At runtime, pre-processing reduces to `output = lut[input]` — an O(1) memory fetch instead of floating-point math.
 
-I encapsulated all CPU-bound logic into a dedicated `Yolo26Processor` class. This creates a clean separation of concerns:
-* **The `dl::Model`** handles the raw execution via the **PIE (AI Extension)** instructions.
-* **The `Yolo26Processor`** manages the "State" of the engine.
+![LUT Preprocessing](assets/preprocess.jpg "Figure 8: The LUT Preprocessing Optimization. (Left) ~780K floating-point operations per frame. (Right) Instant O(1) memory lookups from a pre-computed 256-byte table.")
 
-Crucially, this class is **Stateful**. We calculate invariant data like grid sizes, strides, and lookup tables exactly **once** during initialization. During the hot inference loop, we simply reference these pre-computed values. This eliminates redundant allocation and calculation, ensuring that every millisecond of the runtime is spent on fresh data.
+### 2. Output Optimization: Integer-Domain Filtering
+The model outputs over **600,000 class scores** per frame. A naive implementation would dequantize every score, run `sigmoid()`, then threshold — freezing the MCU for hundreds of milliseconds.
 
-### 2. Input Optimization: The Lookup Table (LUT) Trick
-The most expensive part of pre-processing is **Quantization**.
-Ideally, you take a pixel (0-255), divide it by 255.0 to normalize it to 0.1, and then multiply it by the quantization scale (e.g., 128) to get the Int8 input.
+Since `sigmoid` is monotonic, I reverse-engineer the threshold: instead of converting model output to probability, I convert the confidence threshold back into the **Int8/Int16 domain**. The hot loop uses a single integer comparison to discard >99% of background predictions. Only the <1% that might be actual objects pay the cost of float math.
 
-Mathematically, this is correct. Computationally, it is a disaster. Doing floating-point division and multiplication for every pixel in a 512x512 image requires roughly **786,000 floating-point operations** per frame.
+The decode function is **templated** (`decode_grid<T>`) to handle both `int8_t` and `int16_t` output tensors seamlessly, dispatched by dtype at runtime.
 
-**The Solution:**
-Since our input pixels are always 8-bit integers (0 to 255), there are only **256 possible outcomes**.
-Instead of calculating them on the fly, the `Yolo26Processor` pre-calculates the result for every possible pixel value during the constructor phase and stores it in a 256-byte **[`quantization_lut`](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/yolo26n_esp32p4/main/yolo_processor.hpp)** array.
+![Integer-Domain Filtering](assets/postprocess.jpg "Figure 9: Standard float32 decoding vs. optimized integer-domain filtering.")
 
-At runtime, "pre-processing" is reduced to a simple O(1) array lookup: `output = lut[input]`. This transforms a heavy math operation into a memory fetch, speeding up input preparation by an order of magnitude.
-
-![The Lookup Table (LUT) Optimization](assets/preprocess.jpg "Figure 8: The Lookup Table (LUT) Optimization. (Left) The standard approach wastes CPU cycles performing floating-point normalization and quantization math for every single pixel (over 780k operations per frame). (Right) Since pixel values are finite (0-255), we pre-calculate the results into a static array during initialization. This transforms the heavy computational loop into instant O(1) memory lookups, drastically reducing latency.")
-
-### 3. Output Optimization: Integer-Domain Filtering
-This is where most YOLO ports fail on MCUs. The model outputs over **600,000 class scores** (multiple grids × multiple classes).
-
-A naive implementation would:
-1.  Dequantize every score to Float32.
-2.  Run the expensive `sigmoid()` function.
-3.  Check if the result is above the confidence threshold.
-
-Doing this 600,000 times will freeze the ESP32-P4 for hundreds of milliseconds. We need to filter the noise *fast*.
-
-**The "Hack": [Thresholding in Int8](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/yolo26n_esp32p4/main/yolo_processor.hpp)**
-We know that the `sigmoid` function is monotonic higher input always means higher output. Therefore, we can reverse-engineer the threshold. Instead of converting the *model output* to a probability, we convert our *confidence threshold* (e.g., 0.20) back into the raw **Int8 domain**.
-
-Inside the `postprocess` loop, we apply this filter strictly using integer math. If the raw Int8 value from the PIE-accelerated tensor is less than our calculated `cls_thresh_int8`, we `continue`.
-
-This allows the standard CPU instructions to discard >99% of the background predictions using a single, cheap integer comparison. We only pay the cost of dequantization and floating-point math for the <1% of predictions that might actually be objects.
-
-![Integer-Domain Filtering](assets/postprocess.jpg "Figure 9: Comparison of the Standard Float32 Decoding Pipeline vs. the Optimized Integer-Domain Filtering Pipeline.")
-
-### 4. Zero-Copy Decoding
-Finally, we reap the rewards of the **Graph Surgery** we performed in Step 5.
-
-Because we manually split the graph outputs into distinct "Box" and "Class" tensors, we do not need to perform any memory slicing or copying.
-* The **Box Tensor** is a contiguous block of coordinates.
-* The **Class Tensor** is a contiguous block of scores.
-
-In the C++ code, we simply cast the `void*` data pointer from the `dl::Model` directly to `int8_t*`. We read the data exactly where the AI instructions wrote it. There are no `memcpy` operations, no intermediate buffers, and no overhead. This acts as a direct "Zero-Copy" bridge between the accelerated inference and the application logic.
+### 3. Zero-Copy Decoding
+Because we split the graph outputs in Step 5, we cast the `void*` data pointer from `dl::Model` directly to the appropriate type. No `memcpy`, no intermediate buffers — a direct bridge between the accelerated inference and the application logic.
 
 
-## Step 8: **[Firmware Execution](https://github.com/BoumedineBillal/yolo26n_esp/blob/main/yolo26n_esp32p4/main/app_main.cpp)** & Performance Verification
+## Step 8: The INT16 Precision Wall
 
-With the `.espdl` artifact successfully flashed to the ESP32-P4, the final phase of the project involves verifying the runtime stability and measuring the real-world latency. 
-### Raw Execution Logs
+Here is where the story takes a turn.
 
-The following trace shows the execution flow of the processor. Note the **1780ms inference timing**, which remains remarkably consistent across different input images a hallmark of a purely deterministic integer-domain pipeline.
+After the initial deployment, [sun-xiangyu](https://github.com/sun-xiangyu) from Espressif reviewed the PR and flagged accuracy problems. Upon investigation, I discovered a fundamental issue: **YOLO26n's One-to-One detection head is extremely sensitive to quantization noise**.
+
+Unlike standard YOLO architectures that use Distribution Focal Loss (DFL) with `RegMax=16` to absorb quantization error across multiple bins, YOLO26n uses `RegMax=1` — direct regression with a single value per coordinate. There is no DFL to buffer the noise. Every bit of precision in the head's intermediate activations matters.
+
+The classification branch was fine under INT8. But the bounding box regression was destroyed — boxes were wildly inaccurate, making the model useless for localization.
+
+This launched a series of experiments:
+
+![Quantization Attempts](assets/quantization_attempts.svg "Figure 10: The four quantization strategies attempted, from standard INT8 (regression destroyed) to INT16 LUT with interpolation (the working solution). Each attempt isolated a different precision bottleneck.")
+
+| Attempt | Approach | Accuracy | Latency | Problem |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | Standard INT8 (all layers) | ❌ Very low | ~1.7s | Box regression destroyed |
+| 2 | INT16 Conv + INT8 Swish | ❌ Still low | ~1.8s | INT8 Swish = precision bottleneck |
+| 3 | INT16 Swish (naive) | ✅ Good mAP | ~5s+ | ESP-DL falls back to dequant → float32 → requant |
+| **4** | **INT16 LUT + interpolation** | **✅ 0.365 mAP** | **2,062ms** | **Hardware-accelerated, 4KB per table** |
+
+The critical finding: INT16 Swish was necessary for accuracy, but the only fast path on ESP-DL is a compressed LUT with linear interpolation — a 4KB table (2,049 entries × step size 32) that the hardware interpolates between at runtime.
+
+The problem: **esp-ppq did not know about this LUT behavior.** When Python evaluated the quantized model, it used standard float32 Swish — not the stepped, truncated integer interpolation that the chip actually computes. This meant Python accuracy numbers were unreliable, QAT couldn't learn to compensate for the real hardware behavior, and debugging required physical hardware for every iteration.
 
 
+## Step 9: Closing the Simulation Gap — Building `esp_ppq_lut`
 
-```text
-======================================================================
-  YOLOv26n Inference Demo 
-======================================================================
-W (1743) FbsLoader: The address of fbs model in flash is not aligned with 16 bytes.
+To solve this, I built **[esp_ppq_lut](https://github.com/BoumedineBillal/esp_ppq_lut)** — a drop-in extension library for esp-ppq that creates a "Digital Twin" of the ESP-DL LUT hardware in Python.
 
-=== Testing: bus.jpg ===
-Timings:
-  Pre-process:  20 ms
-  Inference:    1780 ms
-  Post-process: 10 ms
-  Total:        1810 ms
+### The Simulation Mismatch
 
---- Top Detections ---
-Det 1: person (88.08%) | Box: [32.0, 176.0, 144.0, 432.0]
-Det 2: person (81.76%) | Box: [144.0, 192.0, 224.0, 400.0]
-Det 3: person (81.76%) | Box: [416.0, 176.0, 512.0, 416.0]
-Det 4: bus (73.11%) | Box: [16.0, 112.0, 512.0, 368.0]
-Det 5: person (50.00%) | Box: [-8.0, 264.0, 40.0, 408.0]
+| Mode | What PPQ Simulates | What ESP-DL Computes | Match? |
+| :--- | :--- | :--- | :--- |
+| INT8 Activation | All 256 values evaluated | Direct LUT (256 entries) | ✅ Automatic |
+| INT16 LUT (step > 1) | Standard float Swish | Stepped LUT + integer truncated interpolation | ❌ Mismatch |
+
+For INT8, esp-ppq's forward pass is automatically equivalent to the hardware LUT because every possible input has a direct table entry. But for INT16 with step > 1, the two diverge — what PPQ validates is not what the MCU actually computes.
+
+### The Bit-Exact Emulator
+
+The core of the library is a `HardwareEmulator` — a custom `torch.autograd.Function` that replicates ESP-DL's LUT interpolation logic in **pure `torch.int32` arithmetic**. No float operations during interpolation.
+
+The ESP-DL C code it mirrors (`dl_module_lut.hpp`):
+```c
+int idx = input_ptr[i] + 32768;
+int len = idx % step;
+idx = idx / step;
+int x = table_ptr[idx];
+int y = table_ptr[idx + 1];
+output_ptr[i] = x + len * (y - x) / step;
 ```
 
-### Benchmarking the 30% Speed Advantage
+A critical detail: C integer division truncates toward zero, but Python's `//` floors toward negative infinity. For negative numerators, these give different results. The emulator handles this correctly:
+```python
+interp = torch.where(
+    numerator >= 0,
+    numerator // step,           # non-negative: floor = truncate
+    -((-numerator) // step)      # negative: truncate toward zero
+)
+```
 
-The primary objective of this project was to surpass the efficiency of official industry baselines. By choosing the **YOLO26n** architecture at a **512px** resolution and optimizing the stack with custom **Graph Surgery**, I achieved a significant performance leap over the official ESP-DL YOLOv11n implementation.
+The emulator also implements a **Straight-Through Estimator (STE)** backward pass, enabling QAT with faithful hardware behavior in the forward pass.
+
+### The Fencepost Bug
+
+During development, I discovered a critical off-by-one bug in esp-ppq's LUT exporter.
+
+ESP-DL's interpolation reads **two adjacent** table entries (`table_ptr[idx]` and `table_ptr[idx + 1]`). This means you need **N+1 boundary points** for N segments. But the exporter generated exactly N entries:
+
+```python
+# THE BUG (esp-ppq/parser/espdl/export_patterns.py, line 647)
+input = torch.arange(min, max + 1, step=step, dtype=torch.float)  # Generates 2048 points
+```
+
+For the maximum INT16 input of 32767, the MCU calculates `idx = 2047` and then tries to read `table_ptr[2048]` — an **out-of-bounds memory read**. The chip reads garbage from the next memory region, producing outputs like 1,060 instead of the expected 32,177 for Swish at high positive values.
+
+![LUT Fencepost Bug](assets/lut_fencepost.svg "Figure 11: The LUT interpolation mechanism and the fencepost bug. The correct table needs 2,049 entries (N+1 boundaries for N segments). The exporter generated only 2,048, causing an out-of-bounds read for high positive inputs.")
+
+**The fix** (adopted by the esp-ppq maintainers via [sun-xiangyu](https://github.com/sun-xiangyu)):
+```python
+# FIXED
+input = torch.arange(min, max + step, step=step, dtype=torch.float)  # Generates 2049 points
+```
+
+### The Preprocessing Parity Challenge
+
+There was one more source of error. Even small pixel differences between Python and ESP-DL preprocessing accumulate through the quantized model and corrupt output comparisons. Two root causes:
+
+1.  **Interpolation:** Python's `cv2.resize()` defaults to bilinear interpolation. ESP-DL's hardware uses nearest-neighbor.
+2.  **Coordinate Truncation:** OpenCV uses half-pixel center alignment. ESP-DL uses direct `int()` truncation.
+
+I wrote a custom `espdl_preprocess()` function that clones ESP-DL's exact C++ resize math pixel-by-pixel. Combined with bypassing JPEG decoding drift (raw RGB input), this achieved **0 errors across 786,432 pixels**.
+
+### Integration as a PPQ Pass
+
+The library integrates cleanly into the existing quantization workflow:
+```python
+import esp_ppq_lut as esp_lut
+
+esp_lut.initialize(step=32, verbose=True)
+
+# After calibration, apply LUT fusion
+lut_pass = esp_lut.EspdlLUTFusionPass(
+    target_ops=['Swish'],
+    lut_step=32
+)
+lut_pass.optimize(graph=graph, dataloader=cali_loader, executor=executor,
+                  calib_steps=0, collate_fn=lambda x: x.to(device))
+
+# Export (mode switching is automatic)
+exporter = PFL.Exporter(platform=TARGET_PLATFORM)
+exporter.export("model.espdl", graph=graph, int16_lut_step=32)
+```
+
+The exporter automatically switches between **Ideal Math** mode (for LUT table generation) and **Simulation** mode (for validation), ensuring correct table values while providing hardware-faithful forward passes.
 
 
+## Step 10: Proving It Works — The 4-Test Firmware Validation Protocol
 
-While YOLOv11n requires 640px to maintain its accuracy, the superior feature extraction of YOLO26n allows it to reach the same **36.5% mAP** at only 512px. This reduction in computational surface area, combined with SIMD acceleration, results in a **1.7s total latency** effectively making this deployment **30% faster** than the official YOLOv11n baseline while maintaining identical detection quality.
+Claims of "bit-exact" simulation mean nothing without rigorous proof. To scientifically validate the library, I designed a **4-test firmware protocol** that runs on real ESP32-P4 hardware.
 
-### Visualization & Analysis
+Two `.espdl` models are exported from the **same calibrated graph** — one with LUT fusion (Model A), one without (Model B). This isolates the LUT as the only variable.
 
-To verify these results visually, the raw terminal output is processed through a coordinate mapping script. This ensures that the bounding boxes extracted from the esp32p4 model output tensors correctly align with the original input space.
+![Validation Protocol](assets/validation_protocol.svg "Figure 12: The 4-test firmware validation protocol. TEST 1 is the central claim: Python's esp_ppq_lut and the ESP32-P4 hardware produce identical outputs across all 451,584 values. TEST 2 proves the simulation gap exists without the library.")
 
-![Detection Analysis](assets/bus.jpg "Figure 10: Bus Detection Analysis. The model successfully identifies high-density 'person' and 'bus' classes. The 1.7s inference time allows for high-fidelity edge analysis on a low-cost microcontroller.")
+| Test | What It Proves | Comparison | Result |
+| :--- | :--- | :--- | :--- |
+| **TEST 0** | Preprocessing parity | HW preprocess vs Python | **PASS** — 786,432 values, 0 errors |
+| **TEST 1** | LUT simulation accuracy (core claim) | HW(LUT model) vs Python simulation | **PASS** — 451,584 values, 0 errors (100% bit-exact) |
+| **TEST 2** | Simulation gap exists (control) | HW(LUT model) vs float Swish | 399,044 mismatches (88.4%) — expected |
+| **TEST 3** | Test infrastructure is correct (sanity) | HW(IDEAL model) vs float Swish | **PASS** — within ±5 tolerance |
 
-The visualization confirms that the **Quantization-Aware Training (QAT)** successfully preserved the model's regression precision. Even after being compressed into 8-bit integers, the bounding boxes remain tightly fit to the objects, proving that hardware-aware training is the key to unlocking the full potential of the ESP32-P4's RISC-V PIE extensions.
+**TEST 1** is the central result: the Python `esp_ppq_lut` `HardwareEmulator` and the ESP32-P4 LUT hardware produce **identical outputs** for all 451,584 values across 6 output tensors.
+
+**TEST 2** proves why the library is necessary: without it, Python would predict **399,044 wrong values** (88.4% of outputs) compared to what actually runs on-chip.
+
+The Python script also generates detection plots from the LUT simulation output. Firmware detection results are parsed and plotted separately. Both produce **identical detections**.
+
+![Python vs Firmware](assets/python_vs_firmware.jpg "Figure 13: Detection comparison — Python LUT Simulation (left) vs ESP32-P4 Hardware (right). Identical detections: person (0.91), bicycle (0.83), bicycle (0.41), person (0.34). The bit-exact simulation means developers can validate detection quality entirely in Python without flashing physical hardware.")
+
+
+## Step 11: Final Deployment & Merge
+
+### Firmware Execution
+
+With the validated pipeline complete, the final deployment shows consistent, deterministic execution:
+
+```text
+I (2154) image:: bus.jpg
+I (4354) yolo26_detect: Pre: 12 ms | Inf: 2071 ms | Post: 13 ms
+I (4354) YOLO26: [category: person, score: 0.55, x1: 63, y1: 263, x2: 95, y2: 414]
+I (4354) YOLO26: [category: bus, score: 0.79, x1: 70, y1: 109, x2: 448, y2: 349]
+I (4364) YOLO26: [category: person, score: 0.83, x1: 86, y1: 187, x2: 177, y2: 428]
+I (4364) YOLO26: [category: person, score: 0.76, x1: 169, y1: 194, x2: 229, y2: 406]
+I (4374) YOLO26: [category: person, score: 0.70, x1: 380, y1: 187, x2: 449, y2: 416]
+```
+
+### Multi-Platform Support
+
+The final implementation was validated on both ESP32-P4 and ESP32-S3:
+
+| Model | Input | Pre | Inference | Post | Total | mAP50-95 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| yolo26n_512_s8_p4 | 512×512 | 12ms | 2,067ms | 13ms | ~2.1s | 0.365 |
+| yolo26n_640_s8_p4 | 640×640 | 17ms | 3,474ms | 21ms | ~3.5s | 0.387 |
+| yolo26n_512_s8_s3 | 512×512 | 34ms | 7,822ms | 23ms | ~7.9s | 0.363 |
+| yolo26n_640_s8_s3 | 640×640 | 51ms | 13,107ms | 36ms | ~13.2s | 0.384 |
+
+### Merged into Espressif's esp-dl
+
+The implementation was **[merged into the official esp-dl repository](https://github.com/espressif/esp-dl/pull/286)** as a universal C++ component with three deliverables:
+
+1.  **`models/yolo26`** — A generic YOLO26 C++ class that auto-detects input shape, output dtype, and class count at runtime.
+2.  **`examples/yolo26_detect`** — A production-grade firmware example supporting both stock COCO and custom models (demonstrated with a 28-class Lego Brick dataset via Roboflow integration).
+3.  **`examples/tutorial/how_to_quantize_model/quantize_yolo26`** — End-to-end Jupyter Notebooks for the full PTQ → TQT → LUT quantization pipeline.
+
+The PR received reviews and contributions from [sun-xiangyu](https://github.com/sun-xiangyu), [Ginosko-mia](https://github.com/Ginosko-mia), and [100312dog](https://github.com/100312dog) from the Espressif team.
+
+### What This Achieves Beyond YOLO26n
+
+**A reusable INT16 LUT operator:** The `esp_ppq_lut` library is not specific to Swish — it works with any elementwise INT16 function (Sigmoid, Tanh, or custom activations). [sun-xiangyu confirmed](https://github.com/espressif/esp-dl/pull/286) it should become a built-in esp-ppq pass.
+
+**Accurate pre-silicon validation:** The bit-exact emulation means developers can evaluate mAP and detection quality entirely in Python before the model hits the chip. For any future INT16 LUT deployment on ESP32, the simulation gap is now closed.
+
+**Democratized embedded object detection:** The Roboflow integration and universal C++ component allow any developer to download a dataset, train a model, quantize it, and deploy it to ESP32-P4/S3 — bridging the gap between training and deployment that previously required deep hardware expertise.
+
+![Bus Detection](assets/bus.jpg "Figure 14: Bus Detection Analysis on ESP32-P4. The model identifies high-density 'person' and 'bus' classes with tightly-fit bounding boxes, proving that hardware-aware quantization with INT16 LUT preserves regression precision even after compression to mixed-precision integers.")
