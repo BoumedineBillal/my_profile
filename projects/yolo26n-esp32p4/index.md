@@ -17,7 +17,7 @@ The path to deployment was far from straightforward. Standard Post-Training Quan
 
 But the hardest challenge came after the initial deployment. I discovered that YOLO26n's detection head is so sensitive to quantization noise that INT8 activations completely destroy bounding box regression. The only viable path was INT16 Swish, but ESP-DL's native INT16 Swish falls back to a naive `dequantize → float32 → requantize` path, adding **~660ms per layer** and pushing total inference beyond 5 seconds. To solve this, I built **[esp_ppq_lut](https://github.com/BoumedineBillal/esp_ppq_lut)**, a bit-exact emulation library that creates a "Digital Twin" of ESP-DL's hardware-accelerated LUT interpolation inside Python. This library achieved **0 errors across 451,584 output values** compared to real ESP32-P4 hardware, validated through a rigorous 4-test firmware protocol.
 
-During this work, I also discovered and reported a **fencepost bug** in esp-ppq's LUT exporter that caused out-of-bounds memory reads on the MCU for high positive inputs a fix that was adopted by the esp-ppq maintainers.
+During this work, I also discovered and reported a **[fencepost bug](https://github.com/espressif/esp-dl/pull/286#issuecomment-3888379280)** in esp-ppq's LUT exporter that caused out-of-bounds memory reads on the MCU for high positive inputs a fix that was adopted by the esp-ppq maintainers.
 
 The final validated pipeline: **PTQ → TQT → INT16 LUT fusion → export** delivering **25% faster inference** than the official YOLOv11n baseline while maintaining superior accuracy.
 
@@ -258,6 +258,8 @@ exporter.export(inference_export_path, graph=graph, int16_lut_step=32)
 
 ![The .espdl Artifact](assets/espdl.jpg "Figure 7: Inside the .espdl Artifact. Hardware-specific primitives replace generic ONNX operations. Note the Swish activation fused into a Look-Up Table (LUT), and explicit RequantizeLinear nodes for scale correction between integer operations.")
 
+![Netron LUT Nodes](assets/netron_lut_layers.jpg "Figure 7b: Netron visualization of the final exported .espdl model after INT16 LUT fusion. The node properties confirm: type=LUT, original_op_type=Swish, quant_type=S16, int16_lut_step=32. Each LUT node replaces an INT16 Swish activation with a compact 4KB hardware-accelerated look-up table.")
+
 
 ## Step 7: The C++ Inference Engine
 
@@ -265,19 +267,28 @@ Many developers think the job is done once the model is quantized. On an embedde
 
 I designed the C++ runtime as a universal **`YOLO26`** component that auto-detects input shape, output dtype (INT8/INT16), and number of classes from the `.espdl` header at runtime no recompilation for custom models.
 
-### 1. Input Optimization: The LUT Trick
-The most expensive part of pre-processing is quantization normalizing pixels to [0,1] then scaling to Int8.
+The final implementation was refined through code review with [Ginosko-mia](https://github.com/Ginosko-mia) and [100312dog](https://github.com/100312dog) from Espressif, replacing prototype code with native ESP-DL APIs for production quality.
 
-Since input pixels are always 8-bit integers (0 to 255), there are only **256 possible outcomes**. The processor pre-calculates all results during initialization into a 256-byte **quantization LUT**. At runtime, pre-processing reduces to `output = lut[input]` an O(1) memory fetch instead of floating-point math.
+### 1. Input: Hardware-Accelerated Preprocessing
+Following [100312dog](https://github.com/100312dog)'s review, the custom resize + LUT preprocessing was replaced with ESP-DL's official **`ImagePreprocessor`**. This fuses the entire image pipeline crop, resize, letterbox padding, normalization, and quantization into a **single pass with PIE (SIMD) acceleration**:
 
-![LUT Preprocessing](assets/preprocess.jpg "Figure 8: The LUT Preprocessing Optimization. (Left) ~780K floating-point operations per frame. (Right) Instant O(1) memory lookups from a pre-computed 256-byte table.")
+- **Prototype:** `read → resize → write → read → LUT → write` (two memory passes)
+- **Final:** `read → (resize + LUT) → write` (one fused pass, PIE-accelerated)
 
-### 2. Output Optimization: Integer-Domain Filtering
+The `ImagePreprocessor` also implements letterbox with `make_border`, aligning exactly with the `ultralytics` preprocessing. Timing was upgraded from `xTaskGetTickCount()` (10ms precision) to `esp_timer_get_time()` (microsecond precision).
+
+![LUT Preprocessing](assets/preprocess.jpg "Figure 8: The LUT Preprocessing Concept. Input pixels (0-255) have only 256 possible quantized outcomes. The hardware ImagePreprocessor fuses resize + letterbox + SIMD LUT quantization into a single PIE-accelerated pass.")
+
+### 2. Output: Integer-Domain Filtering with Native ESP-DL APIs
 The model outputs over **600,000 class scores** per frame. A naive implementation would dequantize every score, run `sigmoid()`, then threshold freezing the MCU for hundreds of milliseconds.
 
-Since `sigmoid` is monotonic, I reverse-engineer the threshold: instead of converting model output to probability, I convert the confidence threshold back into the **Int8/Int16 domain**. The hot loop uses a single integer comparison to discard >99% of background predictions. Only the <1% that might be actual objects pay the cost of float math.
+Since `sigmoid` is monotonic, I reverse-engineer the threshold using `dl::math::inverse_sigmoid`: instead of converting model output to probability, I convert the confidence threshold back into the **Int8/Int16 domain**. The hot loop uses a single integer comparison to discard >99% of background predictions. Only the <1% that might be actual objects pay the cost of dequantization via `dl::dequantize` and `dl::math::sigmoid`.
 
-The decode function is **templated** (`decode_grid<T>`) to handle both `int8_t` and `int16_t` output tensors seamlessly, dispatched by dtype at runtime.
+The decode function is **templated** (`decode_grid<T>`) to handle both `int8_t` and `int16_t` output tensors seamlessly, with dtype-based dispatch at runtime. Scale factors use the hardware `DL_SCALE` macro instead of floating-point `std::pow`.
+
+For the final top-K selection (since YOLO26n is NMS-free), `std::nth_element` replaces `std::sort` an O(N) partial sort that [Ginosko-mia estimated](https://github.com/espressif/esp-dl/pull/286) could reduce post-processing latency from ~21ms to ~14ms on the 640px model.
+
+The output uses ESP-DL's native `dl::detect::result_t` structure instead of a custom struct, ensuring compatibility with downstream ESP-DL utilities.
 
 ![Integer-Domain Filtering](assets/postprocess.jpg "Figure 9: Standard float32 decoding vs. optimized integer-domain filtering.")
 
@@ -364,7 +375,7 @@ For the maximum INT16 input of 32767, the MCU calculates `idx = 2047` and then t
 
 ![LUT Fencepost Bug](assets/lut_fencepost.svg "Figure 11: The LUT interpolation mechanism and the fencepost bug. The correct table needs 2,049 entries (N+1 boundaries for N segments). The exporter generated only 2,048, causing an out-of-bounds read for high positive inputs.")
 
-**The fix** (adopted by the esp-ppq maintainers via [sun-xiangyu](https://github.com/sun-xiangyu)):
+**The fix** ([adopted by the esp-ppq maintainers](https://github.com/espressif/esp-dl/pull/286#issuecomment-3888379280)):
 ```python
 # FIXED
 input = torch.arange(min, max + step, step=step, dtype=torch.float)  # Generates 2049 points
